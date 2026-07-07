@@ -59,7 +59,8 @@ st.config.set_option("theme.primaryColor", "#1f77b4")
 # ============================================================
 # 基本配置
 # ============================================================
-
+ROUND_NO = 3                      # 当前为第三轮专家咨询
+FIXED_DATE_STR = "2026年7月7日"    # 第三轮统一填表日期
 ADMIN_PASSCODE = "admin123"       # 管理员导出数据口令
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -356,7 +357,7 @@ st.divider()
 # --- 专家基本信息 ---
 st.subheader("专家基本信息")
 expert_name = st.text_input("专家姓名 *", key="expert_name", placeholder="请输入您的姓名")
-st.caption(f"填表日期：{FIXED_DATE_STR}（第 {ROUND_NO} 轮专家咨询）")
+st.caption(f"日期：{FIXED_DATE_STR}（第 {ROUND_NO} 轮专家咨询）")
 st.divider()
 
 # --- 填表说明 ---
