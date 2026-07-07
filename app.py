@@ -68,7 +68,7 @@ init_db()
 
 
 # ============================================================
-# 页面样式配置 (全局加大字体、1.5倍行距、全面去红美化)
+# 页面样式配置 (全局加大字体、1.5倍行距、强力去红美化)
 # ============================================================
 st.set_page_config(page_title="医护人员感染性职业暴露风险评估——专家AHP问卷", layout="centered")
 
@@ -92,27 +92,39 @@ st.markdown("""
         color: #2c3e50 !important;
     }
     
-    /* 2. 彻底改造滑动条：消除刺眼鲜红，放大并优化标度文字 */
-    /* 放大滑动条部分的数字/文字提示 */
-    div[data-testid="stSelectSlider"] span, 
-    div[data-testid="stSelectSlider"] p,
-    div[data-testid="stSelectSlider"] div {
-        font-size: 18px !important;
+    /* 2. 圆形滑块纽扣：强行锁定为蓝色 */
+    div[role="slider"] {
+        background-color: #1f77b4 !important;
+        border: 2px solid #1f77b4 !important;
+        box-shadow: none !important;
     }
-    /* 精准抓取滑块下方的激活文本，强行将默认的鲜红色覆写为温馨的医疗蓝 */
-    div[data-testid="stSelectSlider"] [style*="color"],
-    div[data-testid="stSelectSlider"] span[data-baseweb="typography"] {
+    
+    /* 3. 滑动条左侧已激活轨道：精准拦截内联红色背景样式并替换为蓝色 */
+    div[data-testid="stSelectSlider"] [style*="background-color: rgb(255, 75, 75)"],
+    div[data-testid="stSelectSlider"] [style*="background-color:rgb(255, 75, 75)"],
+    div[data-testid="stSelectSlider"] [style*="background: rgb(255, 75, 75)"],
+    div[data-testid="stSelectSlider"] [style*="background:rgb(255, 75, 75)"],
+    div[data-testid="stSelectSlider"] [style*="background-color: #ff4b4b"],
+    div[data-testid="stSelectSlider"] [style*="background: #ff4b4b"] {
+        background-color: #1f77b4 !important;
+        background: #1f77b4 !important;
+    }
+    
+    /* 4. 核心修正：精准拦截图片 a9bcc3a4-daf0-4898-a712-d6031973fce9.png 中的红色提示文字 */
+    /* 强力染蓝并显著放大至 22px 粗体，极大提升辨识度 */
+    div[data-testid="stSelectSlider"] [style*="color: rgb(255, 75, 75)"],
+    div[data-testid="stSelectSlider"] [style*="color:rgb(255, 75, 75)"],
+    div[data-testid="stSelectSlider"] [style*="color: #ff4b4b"],
+    div[data-testid="stSelectSlider"] [style*="color:#ff4b4b"] {
         color: #1f77b4 !important;
+        font-size: 22px !important;
         font-weight: bold !important;
     }
-    /* 将滑动条的圆形滑块颜色也从鲜红替换为统一的蓝色 */
-    div[data-testid="stSelectSlider"] div[role="slider"] {
-        background-color: #1f77b4 !important;
-        border-color: #1f77b4 !important;
-    }
-    /* 将滑动条左侧轨道的激活颜色从鲜红替换为蓝色 */
-    .stSlider [style*="background-color"] {
-        background-color: #1f77b4 !important;
+    
+    /* 底部各个固定档位刻度（如左9...1...右9）的大小保持16px，防止与上方主提示词冲突 */
+    div[data-testid="stSelectSlider"] div[data-baseweb="slider"] + div span {
+        font-size: 16px !important;
+        color: #555555 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -182,7 +194,7 @@ L2_C_ITEMS = ["C1.工作场景暴露风险", "C2.个体生理易感性", "C3.个
 L2_C_DEFS = [
     "包含下属指标：C1.1 操作暴露风险，C1.2 岗位暴露强度，C1.3 工作场景暴露时间。",
     "包含下属指标：C2.1 基础健康状况，C2.2 免疫能力。",
-    "包含下属指标：C3.1 尺寸匹配性，C3.2 操作灵活性，C3.3 舒适耐受性，C3.4 个体特征适配性，C3.5 基础健康适宜性。"
+    "包含下属指标：C3.1 尺寸匹配性', 'C3.2 操作灵活性', 'C3.3 舒适耐受性', 'C3.4 个体特征适配性', 'C3.5 基础健康适宜性。"
 ]
 
 LEVEL3_DEFS = {
@@ -224,7 +236,7 @@ LEVEL3_DEFS = {
     "L3_B2": [
         "感染者在医疗活动中其行为是否能够被有效管理和限制，行为不可控可能增加体液飞溅、气溶胶产生及环境污染的风险。",
         "医护人员在诊疗和护理过程中接触感染者血液、分泌物或排泄物的可能性，该风险直接关系到经皮或黏膜暴露的发生。",
-        "单位时间或空间内感染者聚集的程度，感染者高度集中可能显著增加环境污染负荷 and 医护人员的整体暴露风险。",
+        "单位时间或空间内感染者聚集的程度，感染者高度集中可能显著增加环境污染负荷和医护人员的整体暴露风险。",
         "感染者院内或院际移动过程的风险及管理完备性，该过程可能扩大病原体污染范围并增加医护人员的防控难度。",
     ],
     "L3_B3": [
@@ -256,7 +268,6 @@ LEVEL3_DEFS = {
 # 矩阵 UI 生成器
 # ============================================================
 def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = None):
-    # 蓝色大号字体显示标题 (与整体协调，设为 24px)
     st.markdown(f"<h3 style='color: #1f77b4; font-size: 24px; margin-top: 30px;'>{parent_title} 的下属指标对比</h3>", unsafe_allow_html=True)
 
     if defs:
@@ -267,11 +278,10 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
     n = len(items)
     matrix = np.ones((n, n))
     pairwise_values = {}
-    all_default = True  # 检测是否全是默认值 1
+    all_default = True
 
     for i in range(n):
         for j in range(i + 1, n):
-            # 对比文字整体调小并统一为 18px 粗体，彻底解决像图片中最后一个字尴尬分行的问题
             st.markdown(f"""
             <div style='display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 5px;'>
                 <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: right; width: 45%;'>{items[i]}</div>
@@ -299,7 +309,6 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
     cr = get_ahp_cr(matrix)
     is_valid = True
 
-    # 判断防呆与合法性
     if n > 1 and all_default:
         st.warning("⚠️ 系统检测到该组指标您全部选择了默认的“1(同等重要)”。如果并非漏填，请勾选下方确认框：")
         confirm_all_1 = st.checkbox("☑️ 我确认这组指标确实同等重要", key=f"confirm_all_1_{matrix_key}")
@@ -320,7 +329,6 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
 
     st.markdown("<hr style='border: 1px dashed #d3d3d3; margin: 30px 0;'>", unsafe_allow_html=True)
 
-    # 记录到 session_state
     st.session_state.setdefault("matrices_data", {})
     st.session_state.setdefault("cr_results", {})
     st.session_state.setdefault("validity", {})
@@ -372,10 +380,10 @@ st.markdown("""
 1. 本问卷需要您对隶属于同一上级指标的各指标，两两比较其相对重要程度。
 2. **判断标度说明**：采用国际通用的 1—9 标度法。
    - **1 (同等重要)**：表示两个指标相比，具有同样重要性。
-   - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要.
-   - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要.
-   - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要.
-   - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要.
+   - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要。
+   - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要。
+   - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要。
+   - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要。
    - **2、4、6、8**：表示上述相邻判断的中间值。
 3. **填写方法（重要⭐）**：我们使用了左右平衡滑块。滑动条停留在中间（1）代表两者**同等重要**。若您认为**左侧**指标比**右侧**重要，请向**左**滑动；若认为**右侧**指标比**左侧**重要，请向**右**滑动。数字越大代表重要程度差异越显著。
    - 例如：“左侧 VS 右侧”的比较中，如果将滑块拖至 **“左3(稍重要)”**，代表：**左侧指标比右侧指标稍微重要**。
@@ -432,7 +440,6 @@ validity = st.session_state.get("validity", {})
 matrices_data = st.session_state.get("matrices_data", {})
 cr_results = st.session_state.get("cr_results", {})
 
-# 提取未填写完整或者冲突过大的矩阵
 failed_titles = [matrices_data[k]["title"] for k, is_valid in validity.items() if not is_valid]
 name_filled = bool(expert_name and expert_name.strip())
 
