@@ -8,6 +8,55 @@ import pandas as pd
 import streamlit as st
 
 # ============================================================
+# 强行重写底层主题颜色 (彻底干掉鲜红，改为深海蓝)
+# ============================================================
+# 注意：配置必须是 Streamlit 命令的第一句
+st.set_page_config(page_title="医护人员感染性职业暴露风险评估——专家AHP问卷", layout="centered")
+
+# 通过设置全局 CSS 强行放大滑动条上方的当前值提示文字（如 1 (同等重要)）
+st.markdown("""
+<style>
+    /* 调整全局普通文本（如说明、含义等）的字体大小和行距 */
+    .stMarkdown p, .stMarkdown li {
+        font-size: 18px !important;
+        line-height: 1.5 !important;
+    }
+    /* 调整折叠面板内文字大小 */
+    .streamlit-expanderContent p {
+        font-size: 17px !important;
+        line-height: 1.5 !important;
+    }
+    
+    /* 放大并加粗“我确认这组指标确实同等重要”复选框的文字 */
+    div[data-testid="stCheckbox"] label p {
+        font-size: 20px !important;
+        font-weight: bold !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* 【核心放大】强制将滑动条上方红色的当前选中值（如 1 同等重要）放大到 22px 粗体 */
+    div[data-testid="stSelectSlider"] [data-testid="stWidgetLabel"] + div div div {
+        font-size: 22px !important;
+        font-weight: bold !important;
+    }
+    div[data-testid="stSelectSlider"] span[data-baseweb="typography"] {
+        font-size: 22px !important;
+        font-weight: bold !important;
+    }
+    
+    /* 底部各个固定档位小刻度（如左9...1...右9）的大小保持16px，防止喧宾夺主 */
+    div[data-testid="stSelectSlider"] div[data-baseweb="slider"] + div span {
+        font-size: 16px !important;
+        color: #555555 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 动态覆盖 Streamlit 的配置参数，彻底完成“去红染蓝”
+st.config.set_option("theme.primaryColor", "#1f77b4")
+
+
+# ============================================================
 # 基本配置
 # ============================================================
 ROUND_NO = 3                      # 当前为第三轮专家咨询
@@ -65,69 +114,6 @@ def load_all_submissions() -> pd.DataFrame:
     return df
 
 init_db()
-
-
-# ============================================================
-# 页面样式配置 (全局加大字体、1.5倍行距、强力去红美化)
-# ============================================================
-st.set_page_config(page_title="医护人员感染性职业暴露风险评估——专家AHP问卷", layout="centered")
-
-st.markdown("""
-<style>
-    /* 调整全局普通文本（如说明、含义等）的字体大小和行距 */
-    .stMarkdown p, .stMarkdown li {
-        font-size: 18px !important;
-        line-height: 1.5 !important;
-    }
-    /* 调整折叠面板内文字大小 */
-    .streamlit-expanderContent p {
-        font-size: 17px !important;
-        line-height: 1.5 !important;
-    }
-    
-    /* 1. 放大并加粗“我确认这组指标确实同等重要”复选框的文字 */
-    div[data-testid="stCheckbox"] label p {
-        font-size: 20px !important;
-        font-weight: bold !important;
-        color: #2c3e50 !important;
-    }
-    
-    /* 2. 圆形滑块纽扣：强行锁定为蓝色 */
-    div[role="slider"] {
-        background-color: #1f77b4 !important;
-        border: 2px solid #1f77b4 !important;
-        box-shadow: none !important;
-    }
-    
-    /* 3. 滑动条左侧已激活轨道：精准拦截内联红色背景样式并替换为蓝色 */
-    div[data-testid="stSelectSlider"] [style*="background-color: rgb(255, 75, 75)"],
-    div[data-testid="stSelectSlider"] [style*="background-color:rgb(255, 75, 75)"],
-    div[data-testid="stSelectSlider"] [style*="background: rgb(255, 75, 75)"],
-    div[data-testid="stSelectSlider"] [style*="background:rgb(255, 75, 75)"],
-    div[data-testid="stSelectSlider"] [style*="background-color: #ff4b4b"],
-    div[data-testid="stSelectSlider"] [style*="background: #ff4b4b"] {
-        background-color: #1f77b4 !important;
-        background: #1f77b4 !important;
-    }
-    
-    /* 4. 核心修正：精准拦截图片 a9bcc3a4-daf0-4898-a712-d6031973fce9.png 中的红色提示文字 */
-    /* 强力染蓝并显著放大至 22px 粗体，极大提升辨识度 */
-    div[data-testid="stSelectSlider"] [style*="color: rgb(255, 75, 75)"],
-    div[data-testid="stSelectSlider"] [style*="color:rgb(255, 75, 75)"],
-    div[data-testid="stSelectSlider"] [style*="color: #ff4b4b"],
-    div[data-testid="stSelectSlider"] [style*="color:#ff4b4b"] {
-        color: #1f77b4 !important;
-        font-size: 22px !important;
-        font-weight: bold !important;
-    }
-    
-    /* 底部各个固定档位刻度（如左9...1...右9）的大小保持16px，防止与上方主提示词冲突 */
-    div[data-testid="stSelectSlider"] div[data-baseweb="slider"] + div span {
-        font-size: 16px !important;
-        color: #555555 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -194,7 +180,7 @@ L2_C_ITEMS = ["C1.工作场景暴露风险", "C2.个体生理易感性", "C3.个
 L2_C_DEFS = [
     "包含下属指标：C1.1 操作暴露风险，C1.2 岗位暴露强度，C1.3 工作场景暴露时间。",
     "包含下属指标：C2.1 基础健康状况，C2.2 免疫能力。",
-    "包含下属指标：C3.1 尺寸匹配性', 'C3.2 操作灵活性', 'C3.3 舒适耐受性', 'C3.4 个体特征适配性', 'C3.5 基础健康适宜性。"
+    "包含下属指标：C3.1 尺寸匹配性, C3.2 操作灵活性, C3.3 舒适耐受性, C3.4 个体特征适配性, C3.5 基础健康适宜性。"
 ]
 
 LEVEL3_DEFS = {
@@ -358,7 +344,7 @@ st.markdown("""
 
 为科学识别和评估医护人员在临床工作中面临的感染性职业暴露风险，构建适用于本院的“医护人员感染性职业暴露风险评估指标体系”，本课题组在前期文献研究与德尔菲专家咨询的基础上，已确立了由“病原体与相应疾病风险特征（A）”“环境暴露风险（B）”“个体风险与健康基础（C）”三个一级指标、13 个二级指标及 45 个三级指标组成的三级评价指标体系。为进一步确定各层级指标在风险评估中的相对重要程度（权重），本课题拟采用层次分析法（Analytic Hierarchy Process, AHP），邀请您根据自身的专业知识与临床实践经验，对同一上级指标下的各指标进行两两比较判断。
 
-您的专业背景与丰富经验对本研究的科学性、实用性至关重要，恳请您结合实际工作情况，独立、审慎地填写本问卷。填写过程中如对指标含义存有疑问，请参见折叠面板中的“指标含义说明”。本问卷所填写内容仅用于本课题的学术研究，数据将进行匿名化处理，不作其他任何用途，请您放心填写。
+您的专业背景与丰富经验对本研究的科学性、实用性至关重要，恳请您结合实际工作情况，独立、审慎地填写本问卷。填写过程中如对指标含义存有疑问，请参见折叠面板中的“指标含义说明”。本问卷所填写内容仅用于本课题之学术研究，数据将进行匿名化处理，不作其他任何用途，请您放心填写。
 
 再次感谢您的大力支持与悉心指导！  
 <div style='text-align: right; font-weight: bold; font-size: 18px; line-height: 1.6;'>
