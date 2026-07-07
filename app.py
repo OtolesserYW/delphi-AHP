@@ -68,7 +68,7 @@ init_db()
 
 
 # ============================================================
-# 页面样式配置 (全局加大字体、1.5倍行距)
+# 页面样式配置 (全局加大字体、1.5倍行距、全面去红美化)
 # ============================================================
 st.set_page_config(page_title="医护人员感染性职业暴露风险评估——专家AHP问卷", layout="centered")
 
@@ -84,9 +84,35 @@ st.markdown("""
         font-size: 17px !important;
         line-height: 1.5 !important;
     }
-    /* 统一调整 Checkbox 的字体 */
-    .stCheckbox span {
+    
+    /* 1. 放大并加粗“我确认这组指标确实同等重要”复选框的文字 */
+    div[data-testid="stCheckbox"] label p {
+        font-size: 20px !important;
+        font-weight: bold !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* 2. 彻底改造滑动条：消除刺眼鲜红，放大并优化标度文字 */
+    /* 放大滑动条部分的数字/文字提示 */
+    div[data-testid="stSelectSlider"] span, 
+    div[data-testid="stSelectSlider"] p,
+    div[data-testid="stSelectSlider"] div {
         font-size: 18px !important;
+    }
+    /* 精准抓取滑块下方的激活文本，强行将默认的鲜红色覆写为温馨的医疗蓝 */
+    div[data-testid="stSelectSlider"] [style*="color"],
+    div[data-testid="stSelectSlider"] span[data-baseweb="typography"] {
+        color: #1f77b4 !important;
+        font-weight: bold !important;
+    }
+    /* 将滑动条的圆形滑块颜色也从鲜红替换为统一的蓝色 */
+    div[data-testid="stSelectSlider"] div[role="slider"] {
+        background-color: #1f77b4 !important;
+        border-color: #1f77b4 !important;
+    }
+    /* 将滑动条左侧轨道的激活颜色从鲜红替换为蓝色 */
+    .stSlider [style*="background-color"] {
+        background-color: #1f77b4 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -128,7 +154,6 @@ def option_to_value(opt: str) -> float:
 # ============================================================
 # 各级指标列表及说明内容
 # ============================================================
-# --- 一级指标 ---
 L1_ITEMS = ["A.病原体与相应疾病风险特征", "B.环境暴露风险", "C.个体风险与健康基础"]
 L1_DEFS = [
     "包含下属指标：A1.病原体基础属性，A2.病原体变异与进化潜力，A3.传播特性与潜力，A4.环境存活能力，A5.疾病临床严重性，A6.临床防治有效性。",
@@ -136,7 +161,6 @@ L1_DEFS = [
     "包含下属指标：C1.工作场景暴露风险，C2.个体生理易感性，C3.个体防护装备的身体适配性。"
 ]
 
-# --- 二级指标 ---
 L2_A_ITEMS = ["A1.病原体基础属性", "A2.病原体变异与进化潜力", "A3.传播特性与潜力", "A4.环境存活能力", "A5.疾病临床严重性", "A6.临床防治有效性"]
 L2_A_DEFS = [
     "包含下属指标：A1.1 病原体生物危害分级，A1.2 病原体谱构成，A1.3 病原体载量。",
@@ -161,7 +185,6 @@ L2_C_DEFS = [
     "包含下属指标：C3.1 尺寸匹配性，C3.2 操作灵活性，C3.3 舒适耐受性，C3.4 个体特征适配性，C3.5 基础健康适宜性。"
 ]
 
-# --- 三级指标 ---
 LEVEL3_DEFS = {
     "L3_A1": [
         "根据《人间传染的病原微生物名录》等标准，根据病原微生物的传染性、感染后对个体或群体的危害程度，对其进行生物安全等级划分（通常为第一至四类），以反映医护人员在接触该病原体时所面临的基础感染风险水平。",
@@ -169,13 +192,13 @@ LEVEL3_DEFS = {
         "指传染源的特定体液、分泌物或组织中，单位体积内所含有的具有活性的病原体数量。该指标通常与患者的临床症状严重程度密切相关，重症患者或疾病急性发作期人群载量更高、传播力最强，直接关系到医护人员发生有效暴露和感染的可能性。",
     ],
     "L3_A2": [
-        "病原体在分子水平持续发生变异 and 演化的特征，用以体现其传播性、致病性及防控不确定性的变化趋势。",
+        "病原体在分子水平持续发生变异和演化的特征，用以体现其传播性、致病性及防控不确定性的变化趋势。",
         "不同病原体株系之间的基因差异程度，用以反映其潜在新发风险和防控复杂性。",
     ],
     "L3_A3": [
         "病原体可通过一种或多种传播方式传播，并在医疗活动中形成叠加传播风险的特征，直接影响医护人员的暴露方式和防护要求；当存在未知或不确定传播途径时，其不确定性将直接增加职业暴露风险评估的复杂性与防控难度。",
         "基本传染数R0指在全部易感人群（无免疫或防控措施）中，一个感染者在其传染期内平均产生的二级感染病例数；有效传染数Re（也称Rt）是实际环境下已考虑人口免疫水平、行为干预、疫苗接种、季节因素等抑制作用的传播指数，二者用以反映不同防控条件下病原体持续传播的潜在风险水平。",
-        "感染者在未出现明显症状时仍可传播病原体的特征，这种隐匿性传播增加了医护人员识别感染源 and 防控暴露的难度。",
+        "感染者在未出现明显症状时仍可传播病原体的特征，这种隐匿性传播增加了医护人员识别感染源和防控暴露的难度。",
     ],
     "L3_A4": [
         "病原体固有的理化抵抗特性，即其对各类化学消毒因子及物理灭活因子的生物学敏感程度，反映该病原体从生物结构上抵抗人工干扰、保持感染活性的难易程度。",
@@ -201,7 +224,7 @@ LEVEL3_DEFS = {
     "L3_B2": [
         "感染者在医疗活动中其行为是否能够被有效管理和限制，行为不可控可能增加体液飞溅、气溶胶产生及环境污染的风险。",
         "医护人员在诊疗和护理过程中接触感染者血液、分泌物或排泄物的可能性，该风险直接关系到经皮或黏膜暴露的发生。",
-        "单位时间或空间内感染者聚集的程度，感染者高度集中可能显著增加环境污染负荷和医护人员的整体暴露风险。",
+        "单位时间或空间内感染者聚集的程度，感染者高度集中可能显著增加环境污染负荷 and 医护人员的整体暴露风险。",
         "感染者院内或院际移动过程的风险及管理完备性，该过程可能扩大病原体污染范围并增加医护人员的防控难度。",
     ],
     "L3_B3": [
@@ -233,8 +256,8 @@ LEVEL3_DEFS = {
 # 矩阵 UI 生成器
 # ============================================================
 def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = None):
-    # 蓝色大号字体显示标题 (加大至 26px)
-    st.markdown(f"<h3 style='color: #1f77b4; font-size: 26px; margin-top: 30px;'>{parent_title} 的下属指标对比</h3>", unsafe_allow_html=True)
+    # 蓝色大号字体显示标题 (与整体协调，设为 24px)
+    st.markdown(f"<h3 style='color: #1f77b4; font-size: 24px; margin-top: 30px;'>{parent_title} 的下属指标对比</h3>", unsafe_allow_html=True)
 
     if defs:
         with st.expander("📖 点击查看指标包含内容或含义说明"):
@@ -248,12 +271,12 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
 
     for i in range(n):
         for j in range(i + 1, n):
-            # 美化对比文字：左右分立，中间VS，字体进一步放大 (指标24px，VS20px)
+            # 对比文字整体调小并统一为 18px 粗体，彻底解决像图片中最后一个字尴尬分行的问题
             st.markdown(f"""
-            <div style='display: flex; justify-content: center; align-items: center; margin-top: 25px; margin-bottom: 5px;'>
-                <div style='font-size: 24px; font-weight: bold; color: #1f77b4; text-align: right; width: 45%;'>{items[i]}</div>
-                <div style='font-size: 20px; font-weight: bold; color: #888; text-align: center; width: 10%;'> VS </div>
-                <div style='font-size: 24px; font-weight: bold; color: #1f77b4; text-align: left; width: 45%;'>{items[j]}</div>
+            <div style='display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 5px;'>
+                <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: right; width: 45%;'>{items[i]}</div>
+                <div style='font-size: 15px; font-weight: bold; color: #888; text-align: center; width: 10%;'> VS </div>
+                <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: left; width: 45%;'>{items[j]}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -276,7 +299,7 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
     cr = get_ahp_cr(matrix)
     is_valid = True
 
-    # 判断防呆与合法性 (加入同等重要确认逻辑，并修改颜色为暖色)
+    # 判断防呆与合法性
     if n > 1 and all_default:
         st.warning("⚠️ 系统检测到该组指标您全部选择了默认的“1(同等重要)”。如果并非漏填，请勾选下方确认框：")
         confirm_all_1 = st.checkbox("☑️ 我确认这组指标确实同等重要", key=f"confirm_all_1_{matrix_key}")
@@ -286,7 +309,6 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
         else:
             is_valid = False
     elif cr >= 0.1:
-        # 使用暖橙色的温和提示框，代替刺眼的 st.error 鲜红
         st.markdown(f"""
         <div style='background-color: #fff4e5; color: #d97706; padding: 12px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; margin-top: 10px;'>
             ⚠️ <strong>一致性提示：</strong> 当前判断矩阵的逻辑冲突偏大 (CR: {cr:.3f})，请微调您的打分使其小于 0.1，以确保结果的科学性。
@@ -350,10 +372,10 @@ st.markdown("""
 1. 本问卷需要您对隶属于同一上级指标的各指标，两两比较其相对重要程度。
 2. **判断标度说明**：采用国际通用的 1—9 标度法。
    - **1 (同等重要)**：表示两个指标相比，具有同样重要性。
-   - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要。
-   - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要。
-   - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要。
-   - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要。
+   - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要.
+   - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要.
+   - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要.
+   - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要.
    - **2、4、6、8**：表示上述相邻判断的中间值。
 3. **填写方法（重要⭐）**：我们使用了左右平衡滑块。滑动条停留在中间（1）代表两者**同等重要**。若您认为**左侧**指标比**右侧**重要，请向**左**滑动；若认为**右侧**指标比**左侧**重要，请向**右**滑动。数字越大代表重要程度差异越显著。
    - 例如：“左侧 VS 右侧”的比较中，如果将滑块拖至 **“左3(稍重要)”**，代表：**左侧指标比右侧指标稍微重要**。
@@ -415,7 +437,6 @@ failed_titles = [matrices_data[k]["title"] for k, is_valid in validity.items() i
 name_filled = bool(expert_name and expert_name.strip())
 
 if failed_titles:
-    # 底部汇总也替换为温和颜色的提示框
     st.markdown(
         f"""
         <div style='background-color: #fff4e5; color: #d97706; padding: 15px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; line-height: 1.5; margin-bottom: 20px;'>
