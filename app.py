@@ -23,7 +23,7 @@ st.markdown("""
     }
     /* 调整折叠面板内文字大小 */
     .streamlit-expanderContent p {
-        font-size: 17px !important;
+        font-size: 18px !important;
         line-height: 1.5 !important;
     }
     
@@ -44,9 +44,9 @@ st.markdown("""
         font-weight: bold !important;
     }
     
-    /* 底部各个固定档位小刻度（如左9...1...右9）的大小保持16px，防止喧宾夺主 */
+    /* 底部各个固定档位小刻度（如左9...1...右9）的大小保持20px，防止喧宾夺主 */
     div[data-testid="stSelectSlider"] div[data-baseweb="slider"] + div span {
-        font-size: 16px !important;
+        font-size: 20px !important;
         color: #555555 !important;
     }
 </style>
@@ -59,8 +59,7 @@ st.config.set_option("theme.primaryColor", "#1f77b4")
 # ============================================================
 # 基本配置
 # ============================================================
-ROUND_NO = 3                      # 当前为第三轮专家咨询
-FIXED_DATE_STR = "2026年7月7日"    # 第三轮统一填表日期
+
 ADMIN_PASSCODE = "admin123"       # 管理员导出数据口令
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -271,7 +270,7 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
             st.markdown(f"""
             <div style='display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 5px;'>
                 <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: right; width: 45%;'>{items[i]}</div>
-                <div style='font-size: 15px; font-weight: bold; color: #888; text-align: center; width: 10%;'> VS </div>
+                <div style='font-size: 18px; font-weight: bold; color: #888; text-align: center; width: 10%;'> VS </div>
                 <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: left; width: 45%;'>{items[j]}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -297,7 +296,7 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
 
     if n > 1 and all_default:
         st.warning("⚠️ 系统检测到该组指标您全部选择了默认的“1(同等重要)”。如果并非漏填，请勾选下方确认框：")
-        confirm_all_1 = st.checkbox("☑️ 我确认这组指标确实同等重要", key=f"confirm_all_1_{matrix_key}")
+        confirm_all_1 = st.checkbox(" 我确认这组指标确实同等重要", key=f"confirm_all_1_{matrix_key}")
         if confirm_all_1:
             st.success("✅ 已确认同等重要 (CR: 0.000)")
             is_valid = True
@@ -305,7 +304,7 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
             is_valid = False
     elif cr >= 0.1:
         st.markdown(f"""
-        <div style='background-color: #fff4e5; color: #d97706; padding: 12px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; margin-top: 10px;'>
+        <div style='background-color: #fff4e5; color: #d97706; padding: 18px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; margin-top: 18px;'>
             ⚠️ <strong>一致性提示：</strong> 当前判断矩阵的逻辑冲突偏大 (CR: {cr:.3f})，请微调您的打分使其小于 0.1，以确保结果的科学性。
         </div>
         """, unsafe_allow_html=True)
@@ -432,7 +431,7 @@ name_filled = bool(expert_name and expert_name.strip())
 if failed_titles:
     st.markdown(
         f"""
-        <div style='background-color: #fff4e5; color: #d97706; padding: 15px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; line-height: 1.5; margin-bottom: 20px;'>
+        <div style='background-color: #fff4e5; color: #d97706; padding: 18px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; line-height: 1.5; margin-bottom: 20px;'>
             <strong>⚠️ 无法提交！以下模块存在未答、需确认“同等重要” 或 逻辑冲突（CR ≥ 0.1），请返回上方修改或确认：</strong><br><br>
             {"<br>".join(f"• {t}" for t in failed_titles)}
         </div>
