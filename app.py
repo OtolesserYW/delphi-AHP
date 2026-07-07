@@ -11,8 +11,8 @@ import streamlit as st
 # 基本配置
 # ============================================================
 ROUND_NO = 3                      # 当前为第三轮专家咨询
-FIXED_DATE_STR = "2026年7月7日"    # 第三轮统一填表日期（无需专家选择）
-ADMIN_PASSCODE = "admin123"       # 管理员导出数据口令，建议部署前修改
+FIXED_DATE_STR = "2026年7月7日"    # 第三轮统一填表日期
+ADMIN_PASSCODE = "admin123"       # 管理员导出数据口令
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -41,7 +41,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 def save_submission(expert_name: str, round_no: int, matrices_data: dict, cr_data: dict):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -59,19 +58,16 @@ def save_submission(expert_name: str, round_no: int, matrices_data: dict, cr_dat
     conn.commit()
     conn.close()
 
-
 def load_all_submissions() -> pd.DataFrame:
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id", conn)
     conn.close()
     return df
 
-
 init_db()
 
-
 # ============================================================
-# AHP 计算函数
+# AHP 计算与交互组件配置
 # ============================================================
 def get_ahp_cr(matrix: np.ndarray) -> float:
     """计算一致性比率 CR。n<=2 时判断矩阵在数学上必然完全一致，CR 恒为 0。"""
@@ -83,19 +79,65 @@ def get_ahp_cr(matrix: np.ndarray) -> float:
     lambda_max = np.max(eigenvalues.real)
     CI = (lambda_max - n) / (n - 1)
 
-    # 平均随机一致性指标 R.I.（Saaty 标准表，n=1~10）
     RI_TABLE = [0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49]
     RI = RI_TABLE[n - 1] if n <= len(RI_TABLE) else 1.49
     if RI == 0:
         return 0.0
 
     cr = CI / RI
-    return max(cr, 0.0)  # 避免浮点误差导致的极小负值
+    return max(cr, 0.0)
+
+# 滑块文字与对应数值的映射
+SLIDER_OPTIONS = [
+    "左9(极重要)", "左8", "左7(强重要)", "左6", "左5(明重要)", "左4", "左3(稍重要)", "左2",
+    "1 (同等重要)",
+    "右2", "右3(稍重要)", "右4", "右5(明重要)", "右6", "右7(强重要)", "右8", "右9(极重要)"
+]
+
+def option_to_value(opt: str) -> float:
+    if opt == "1 (同等重要)": return 1.0
+    if opt.startswith("左"): return float(opt[1:2])
+    if opt.startswith("右"): return 1.0 / float(opt[1:2])
+    return 1.0
 
 
 # ============================================================
-# 三级指标含义说明（点击展开查看，不常驻显示）
+# 各级指标列表及说明内容
 # ============================================================
+# --- 一级指标 ---
+L1_ITEMS = ["A.病原体与相应疾病风险特征", "B.环境暴露风险", "C.个体风险与健康基础"]
+L1_DEFS = [
+    "包含下属指标：A1.病原体基础属性，A2.病原体变异与进化潜力，A3.传播特性与潜力，A4.环境存活能力，A5.疾病临床严重性，A6.临床防治有效性。",
+    "包含下属指标：B1.布局与通风，B2.感染者风险，B3.物品与环境污染风险。",
+    "包含下属指标：C1.工作场景暴露风险，C2.个体生理易感性，C3.个体防护装备的身体适配性。"
+]
+
+# --- 二级指标 ---
+L2_A_ITEMS = ["A1.病原体基础属性", "A2.病原体变异与进化潜力", "A3.传播特性与潜力", "A4.环境存活能力", "A5.疾病临床严重性", "A6.临床防治有效性"]
+L2_A_DEFS = [
+    "包含下属指标：A1.1 病原体生物危害分级，A1.2 病原体谱构成，A1.3 病原体载量。",
+    "包含下属指标：A2.1 分子进化情况，A2.2 遗传距离。",
+    "包含下属指标：A3.1 传播途径与多途径风险，A3.2 基本传染数R0/有效传染数Re，A3.3 无症状/潜伏期传播能力。",
+    "包含下属指标：A4.1 消杀敏感性，A4.2 环境稳定性。",
+    "包含下属指标：A5.1 病例住院率，A5.2 重症率，A5.3 病死率。",
+    "包含下属指标：A6.1 早期诊疗可行性，A6.2 预防接种可及性与有效性，A6.3 特异性治疗药物可及性与有效性，A6.4 病原体耐药性。"
+]
+
+L2_B_ITEMS = ["B1.布局与通风", "B2.感染者风险", "B3.物品与环境污染风险"]
+L2_B_DEFS = [
+    "包含下属指标：B1.1 功能分区合理性，B1.2 流线设置合理性，B1.3 空气质量与气流组织，B1.4 通风保障充分性。",
+    "包含下属指标：B2.1 感染者行为可控性，B2.2 感染者体液暴露风险，B2.3 感染者集中度，B2.4 感染者移动/转运。",
+    "包含下属指标：B3.1 物资与环境表面污染风险，B3.2 空气颗粒暴露风险，B3.3 医疗废物传染风险，B3.4 医疗器械与设备污染风险。"
+]
+
+L2_C_ITEMS = ["C1.工作场景暴露风险", "C2.个体生理易感性", "C3.个体防护装备的身体适配性"]
+L2_C_DEFS = [
+    "包含下属指标：C1.1 操作暴露风险，C1.2 岗位暴露强度，C1.3 工作场景暴露时间。",
+    "包含下属指标：C2.1 基础健康状况，C2.2 免疫能力。",
+    "包含下属指标：C3.1 尺寸匹配性，C3.2 操作灵活性，C3.3 舒适耐受性，C3.4 个体特征适配性，C3.5 基础健康适宜性。"
+]
+
+# --- 三级指标 (原样保留) ---
 LEVEL3_DEFS = {
     "L3_A1": [
         "根据《人间传染的病原微生物名录》等标准，根据病原微生物的传染性、感染后对个体或群体的危害程度，对其进行生物安全等级划分（通常为第一至四类），以反映医护人员在接触该病原体时所面临的基础感染风险水平。",
@@ -162,71 +204,79 @@ LEVEL3_DEFS = {
     ],
 }
 
-# 一级 / 二级指标的简要说明（较短，常驻显示，无需折叠）
-LEVEL1_DESC = {
-    "A.病原体与相应疾病风险特征": "病原体自身生物学特性及所致疾病严重程度、可防治性等内在风险要素。",
-    "B.暴露环境风险": "工作环境布局通风条件、感染者相关状况及物品环境污染水平所形成的外部暴露风险。",
-    "C.个体风险与健康基础": "医护人员个体工作场景暴露特征、生理易感性及防护装备适配情况等个体层面因素。",
-}
-
-LEVEL2_DESC = {
-    "A1.病原体基础属性": "生物危害分级、病原体谱构成及载量水平。",
-    "A2.病原体变异与进化潜力": "分子水平持续变异及不同株系间遗传距离。",
-    "A3.传播特性与潜力": "传播途径与多途径风险、传染数及无症状潜伏期传播能力。",
-    "A4.环境存活能力": "消杀敏感性及环境稳定性。",
-    "A5.疾病临床严重性": "住院率、重症率及病死率。",
-    "A6.临床防治有效性": "早期诊疗、疫苗与治疗药物可及性有效性及病原体耐药性。",
-    "B1.布局与通风": "功能分区、流线设置、空气质量与气流组织及通风保障。",
-    "B2.感染者风险": "感染者行为可控性、体液暴露风险、集中度及移动转运风险。",
-    "B3.物品与环境污染风险": "物资环境表面、空气颗粒、医疗废物及医疗器械设备污染风险。",
-    "C1.工作场景暴露风险": "操作暴露风险、岗位暴露强度及暴露时间。",
-    "C2.个体生理易感性": "基础健康状况及免疫能力。",
-    "C3.个体防护装备的身体适配性": "尺寸匹配、操作灵活、舒适耐受、个体特征及基础健康适宜性。",
-}
-
 
 # ============================================================
 # 矩阵 UI 生成器
 # ============================================================
-def matrix_input(matrix_key: str, title: str, items: list, level3_defs: list = None, brief_desc: str = None):
-    st.markdown(f"### {title}")
+def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = None):
+    # 蓝色大号字体显示标题
+    st.markdown(f"<h3 style='color: #1f77b4; font-size: 22px; margin-top: 30px;'>{parent_title} 的下属指标对比</h3>", unsafe_allow_html=True)
 
-    if brief_desc:
-        st.caption(brief_desc)
-
-    if level3_defs:
-        with st.expander("📖 点击查看三级指标含义说明"):
-            for item_label, definition in zip(items, level3_defs):
+    if defs:
+        with st.expander("📖 点击查看指标包含内容或含义说明"):
+            for item_label, definition in zip(items, defs):
                 st.markdown(f"**{item_label}**：{definition}")
 
     n = len(items)
     matrix = np.ones((n, n))
     pairwise_values = {}
+    all_default = True  # 检测是否全是默认值 1
 
     for i in range(n):
         for j in range(i + 1, n):
-            val = st.slider(f"{items[i]} vs {items[j]}", 1, 9, 1, key=f"{matrix_key}_{i}_{j}")
+            # 美化对比文字：左右分立，中间VS，字体放大
+            st.markdown(f"""
+            <div style='display: flex; justify-content: center; align-items: center; margin-top: 25px; margin-bottom: 5px;'>
+                <div style='font-size: 20px; font-weight: bold; color: #1f77b4; text-align: right; width: 45%;'>{items[i]}</div>
+                <div style='font-size: 16px; font-weight: bold; color: #888; text-align: center; width: 10%;'> VS </div>
+                <div style='font-size: 20px; font-weight: bold; color: #1f77b4; text-align: left; width: 45%;'>{items[j]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            choice = st.select_slider(
+                "请滑动选择相对重要程度",
+                options=SLIDER_OPTIONS,
+                value="1 (同等重要)",
+                key=f"{matrix_key}_{i}_{j}",
+                label_visibility="collapsed"
+            )
+            
+            if choice != "1 (同等重要)":
+                all_default = False
+                
+            val = option_to_value(choice)
             matrix[i, j] = val
             matrix[j, i] = 1 / val
             pairwise_values[f"{i}_{j}"] = val
 
     cr = get_ahp_cr(matrix)
+    is_valid = True
 
-    # 记录到 session_state，供最终提交与后续统计使用
+    # 判断防呆与合法性
+    if n > 1 and all_default:
+        st.warning("⚠️ 此项暂未作答或全部保持同等重要，请务必根据实际情况滑动进行判断，指标权重打分不允许全为同等重要(全选1)。")
+        is_valid = False
+    elif cr >= 0.1:
+        st.error(f"❌ 逻辑冲突过大 (CR: {cr:.3f})，请调整打分，使其小于 0.1")
+        is_valid = False
+    else:
+        st.success(f"✅ 一致性校验通过 (CR: {cr:.3f})")
+
+    st.markdown("<hr style='border: 1px dashed #d3d3d3; margin: 30px 0;'>", unsafe_allow_html=True)
+
+    # 记录到 session_state
     st.session_state.setdefault("matrices_data", {})
     st.session_state.setdefault("cr_results", {})
+    st.session_state.setdefault("validity", {})
+    
     st.session_state["matrices_data"][matrix_key] = {
-        "title": title,
+        "title": f"{parent_title} 的下属指标对比",
         "items": items,
         "pairwise": pairwise_values,
+        "matrix": matrix.tolist() # 保存直接可用于权重计算的二维矩阵 [source: 1]
     }
     st.session_state["cr_results"][matrix_key] = cr
-
-    if cr < 0.1:
-        st.success(f"✅ 一致性校验通过 (CR: {cr:.3f})")
-    else:
-        st.error(f"❌ 逻辑冲突过大 (CR: {cr:.3f})，请调整打分，使其小于 0.1")
-    st.divider()
+    st.session_state["validity"][matrix_key] = is_valid
 
 
 # ============================================================
@@ -234,109 +284,119 @@ def matrix_input(matrix_key: str, title: str, items: list, level3_defs: list = N
 # ============================================================
 st.set_page_config(page_title="医护人员感染性职业暴露风险评估——专家AHP问卷", layout="centered")
 
-st.title("专家德尔菲-AHP调查问卷（第三轮）")
-st.write("请专家根据重要性进行两两比较（1=同等重要，9=极端重要）")
+# --- 开头语 ---
+st.markdown("""
+<h1 style='text-align: center; font-size: 28px;'>医护人员感染性职业暴露风险评估体系构建</h1>
+<h2 style='text-align: center; font-size: 22px; color: #555;'>——层次分析法（AHP）专家咨询问卷</h2>
 
-# --- 专家基本信息（第三轮：仅需姓名，日期固定） ---
+**尊敬的专家：**
+
+您好！首先向您在百忙之中抽出时间参与本次调查表示衷心的感谢！
+
+为科学识别和评估医护人员在临床工作中面临的感染性职业暴露风险，构建适用于本院的“医护人员感染性职业暴露风险评估指标体系”，本课题组在前期文献研究与德尔菲专家咨询的基础上，已确立了由“病原体与相应疾病风险特征（A）”“环境暴露风险（B）”“个体风险与健康基础（C）”三个一级指标、13 个二级指标及 45 个三级指标组成的三级评价指标体系。为进一步确定各层级指标在风险评估中的相对重要程度（权重），本课题拟采用层次分析法（Analytic Hierarchy Process, AHP），邀请您根据自身的专业知识与临床实践经验，对同一上级指标下的各指标进行两两比较判断。
+
+您的专业背景与丰富经验对本研究的科学性、实用性至关重要，恳请您结合实际工作情况，独立、审慎地填写本问卷。填写过程中如对指标含义存有疑问，请参见折叠面板中的“指标含义说明”。本问卷所填写内容仅用于本课题的学术研究，数据将进行匿名化处理，不作其他任何用途，请您放心填写。
+
+再次感谢您的大力支持与悉心指导！  
+**课题组敬上**
+""", unsafe_allow_html=True)
+st.divider()
+
+# --- 专家基本信息 ---
 st.subheader("专家基本信息")
 expert_name = st.text_input("专家姓名 *", key="expert_name", placeholder="请输入您的姓名")
 st.caption(f"填表日期：{FIXED_DATE_STR}（第 {ROUND_NO} 轮专家咨询）")
 st.divider()
 
-# --- 1. 一级指标 ---
-l1_items = ["A.病原体与相应疾病风险特征", "B.暴露环境风险", "C.个体风险与健康基础"]
-st.markdown("#### 一级指标含义")
-for it in l1_items:
-    st.caption(f"**{it}**：{LEVEL1_DESC.get(it, '')}")
-matrix_input("L1", "一级指标对比", l1_items)
+# --- 填表说明 ---
+st.markdown("""
+### 一、填表说明
+1. 本问卷需要您对隶属于同一上级指标的各指标，两两比较其相对重要程度。
+2. **判断标度说明**：采用国际通用的 1—9 标度法。
+   - **1 (同等重要)**：表示两个指标相比，具有同样重要性。
+   - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要。
+   - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要。
+   - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要。
+   - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要。
+   - **2、4、6、8**：表示上述相邻判断的中间值。
+3. **填写方法（重要⭐）**：我们使用了左右平衡滑块。滑动条停留在中间（1）代表两者**同等重要**。若您认为**左侧**指标比**右侧**重要，请向**左**滑动；若认为**右侧**指标比**左侧**重要，请向**右**滑动。数字越大代表重要程度差异越显著。
+   - 例如：“左侧 VS 右侧”的比较中，如果将滑块拖至 **“左3(稍重要)”**，代表：**左侧指标比右侧指标稍微重要**。
+4. 请您结合临床实际及个人专业经验独立判断；如某组指标数量较多、判断确有困难，可优先比较差异明显的指标对，再逐一补齐其余。
+""")
+st.divider()
 
-# --- 2. 二级指标 ---
-l2_a = ["A1.病原体基础属性", "A2.病原体变异与进化潜力", "A3.传播特性与潜力", "A4.环境存活能力", "A5.疾病临床严重性", "A6.临床防治有效性"]
-l2_b = ["B1.布局与通风", "B2.感染者风险", "B3.物品与环境污染风险"]
-l2_c = ["C1.工作场景暴露风险", "C2.个体生理易感性", "C3.个体防护装备的身体适配性"]
+# --- 二、开始正式问卷 ---
+st.markdown("### 二、判断矩阵调查表")
 
-matrix_input("L2_A", "针对【A.病原体与相应疾病风险特征】的二级指标对比", l2_a,
-             brief_desc=" ／ ".join(f"{it}：{LEVEL2_DESC.get(it, '')}" for it in l2_a))
-matrix_input("L2_B", "针对【B.暴露环境风险】的二级指标对比", l2_b,
-             brief_desc=" ／ ".join(f"{it}：{LEVEL2_DESC.get(it, '')}" for it in l2_b))
-matrix_input("L2_C", "针对【C.个体风险与健康基础】的二级指标对比", l2_c,
-             brief_desc=" ／ ".join(f"{it}：{LEVEL2_DESC.get(it, '')}" for it in l2_c))
+# 1. 一级指标
+matrix_input("L1", "总目标（医护人员感染性职业暴露风险）", L1_ITEMS, L1_DEFS)
 
-# --- 3. 三级指标 (A系列) ---
-matrix_input("L3_A1", "A1 下属指标对比",
-             ["A1.1 病原体生物危害分级", "A1.2 病原体谱构成", "A1.3 病原体载量"],
-             level3_defs=LEVEL3_DEFS["L3_A1"])
-matrix_input("L3_A2", "A2 下属指标对比",
-             ["A2.1 分子进化情况", "A2.2 遗传距离"],
-             level3_defs=LEVEL3_DEFS["L3_A2"])
-matrix_input("L3_A3", "A3 下属指标对比",
-             ["A3.1 传播途径与多途径风险", "A3.2 基本传染数R0/有效传染数Re", "A3.3 无症状/潜伏期传播能力"],
-             level3_defs=LEVEL3_DEFS["L3_A3"])
-matrix_input("L3_A4", "A4 下属指标对比",
-             ["A4.1 消杀敏感性", "A4.2 环境稳定性"],
-             level3_defs=LEVEL3_DEFS["L3_A4"])
-matrix_input("L3_A5", "A5 下属指标对比",
-             ["A5.1 病例住院率", "A5.2 重症率", "A5.3 病死率"],
-             level3_defs=LEVEL3_DEFS["L3_A5"])
-matrix_input("L3_A6", "A6 下属指标对比",
-             ["A6.1 早期诊疗可行性", "A6.2 预防接种可及性与有效性", "A6.3 特异性治疗药物可及性与有效性", "A6.4 病原体耐药性"],
-             level3_defs=LEVEL3_DEFS["L3_A6"])
+# 2. 二级指标
+matrix_input("L2_A", "A.病原体与相应疾病风险特征", L2_A_ITEMS, L2_A_DEFS)
+matrix_input("L2_B", "B.环境暴露风险", L2_B_ITEMS, L2_B_DEFS)
+matrix_input("L2_C", "C.个体风险与健康基础", L2_C_ITEMS, L2_C_DEFS)
 
-# --- 4. 三级指标 (B与C系列) ---
-matrix_input("L3_B1", "B1 下属指标对比",
-             ["B1.1 功能分区合理性", "B1.2 流线设置合理性", "B1.3 空气质量与气流组织", "B1.4 通风保障充分性"],
-             level3_defs=LEVEL3_DEFS["L3_B1"])
-matrix_input("L3_B2", "B2 下属指标对比",
-             ["B2.1 感染者行为可控性", "B2.2 感染者体液暴露风险", "B2.3 感染者集中度", "B2.4 感染者移动/转运"],
-             level3_defs=LEVEL3_DEFS["L3_B2"])
-matrix_input("L3_B3", "B3 下属指标对比",
-             ["B3.1 物资与环境表面污染风险", "B3.2 空气颗粒暴露风险", "B3.3 医疗废物传染风险", "B3.4 医疗器械与设备污染风险"],
-             level3_defs=LEVEL3_DEFS["L3_B3"])
+# 3. 三级指标 (A系列)
+matrix_input("L3_A1", "A1.病原体基础属性", ["A1.1 病原体生物危害分级", "A1.2 病原体谱构成", "A1.3 病原体载量"], LEVEL3_DEFS["L3_A1"])
+matrix_input("L3_A2", "A2.病原体变异与进化潜力", ["A2.1 分子进化情况", "A2.2 遗传距离"], LEVEL3_DEFS["L3_A2"])
+matrix_input("L3_A3", "A3.传播特性与潜力", ["A3.1 传播途径与多途径风险", "A3.2 基本传染数R0/有效传染数Re", "A3.3 无症状/潜伏期传播能力"], LEVEL3_DEFS["L3_A3"])
+matrix_input("L3_A4", "A4.环境存活能力", ["A4.1 消杀敏感性", "A4.2 环境稳定性"], LEVEL3_DEFS["L3_A4"])
+matrix_input("L3_A5", "A5.疾病临床严重性", ["A5.1 病例住院率", "A5.2 重症率", "A5.3 病死率"], LEVEL3_DEFS["L3_A5"])
+matrix_input("L3_A6", "A6.临床防治有效性", ["A6.1 早期诊疗可行性", "A6.2 预防接种可及性与有效性", "A6.3 特异性治疗药物可及性与有效性", "A6.4 病原体耐药性"], LEVEL3_DEFS["L3_A6"])
 
-matrix_input("L3_C1", "C1 下属指标对比",
-             ["C1.1 操作暴露风险", "C1.2 岗位暴露强度", "C1.3 工作场景暴露时间"],
-             level3_defs=LEVEL3_DEFS["L3_C1"])
-matrix_input("L3_C2", "C2 下属指标对比",
-             ["C2.1 基础健康状况", "C2.2 免疫能力"],
-             level3_defs=LEVEL3_DEFS["L3_C2"])
-matrix_input("L3_C3", "C3 下属指标对比",
-             ["C3.1 尺寸匹配性", "C3.2 操作灵活性", "C3.3 舒适耐受性", "C3.4 个体特征适配性", "C3.5 基础健康适宜性"],
-             level3_defs=LEVEL3_DEFS["L3_C3"])
+# 4. 三级指标 (B与C系列)
+matrix_input("L3_B1", "B1.布局与通风", ["B1.1 功能分区合理性", "B1.2 流线设置合理性", "B1.3 空气质量与气流组织", "B1.4 通风保障充分性"], LEVEL3_DEFS["L3_B1"])
+matrix_input("L3_B2", "B2.感染者风险", ["B2.1 感染者行为可控性", "B2.2 感染者体液暴露风险", "B2.3 感染者集中度", "B2.4 感染者移动/转运"], LEVEL3_DEFS["L3_B2"])
+matrix_input("L3_B3", "B3.物品与环境污染风险", ["B3.1 物资与环境表面污染风险", "B3.2 空气颗粒暴露风险", "B3.3 医疗废物传染风险", "B3.4 医疗器械与设备污染风险"], LEVEL3_DEFS["L3_B3"])
+
+matrix_input("L3_C1", "C1.工作场景暴露风险", ["C1.1 操作暴露风险", "C1.2 岗位暴露强度", "C1.3 工作场景暴露时间"], LEVEL3_DEFS["L3_C1"])
+matrix_input("L3_C2", "C2.个体生理易感性", ["C2.1 基础健康状况", "C2.2 免疫能力"], LEVEL3_DEFS["L3_C2"])
+matrix_input("L3_C3", "C3.个体防护装备的身体适配性", ["C3.1 尺寸匹配性", "C3.2 操作灵活性", "C3.3 舒适耐受性", "C3.4 个体特征适配性", "C3.5 基础健康适宜性"], LEVEL3_DEFS["L3_C3"])
+
 
 # ============================================================
-# 提交区：一致性未通过或姓名未填时禁止提交
+# 提交区与结束语
 # ============================================================
+st.markdown("""
+### 结束语
+至此，本次问卷调查内容全部结束。衷心感谢您在繁忙的临床与科研工作之余，耐心、细致地完成本次两两比较判断！您所提供的专业判断，将通过层次分析法计算得出各级指标的权重系数，并结合一致性检验加以校核，为构建科学、合理的“医护人员感染性职业暴露风险评估指标体系”提供重要依据，对提升本院及同类专科医院医护人员职业防护水平具有切实意义。
+
+若后续需要根据一致性检验结果对个别判断进行复核或修正，我们可能会再次与您联系，恳请您予以理解和支持。您的每一份意见都弥足珍贵，再次向您致以最诚挚的谢意！  
+**课题组 敬上**
+""")
+
 st.markdown("---")
-st.subheader("提交问卷")
 
-cr_results = st.session_state.get("cr_results", {})
+validity = st.session_state.get("validity", {})
 matrices_data = st.session_state.get("matrices_data", {})
+cr_results = st.session_state.get("cr_results", {})
 
-failed_titles = [matrices_data[k]["title"] for k, v in cr_results.items() if v >= 0.1]
+# 提取未填写完整或者冲突过大的矩阵
+failed_titles = [matrices_data[k]["title"] for k, is_valid in validity.items() if not is_valid]
 name_filled = bool(expert_name and expert_name.strip())
 
 if failed_titles:
     st.error(
-        "以下判断矩阵尚未通过一致性检验（CR ≥ 0.1），请返回上方调整打分后再提交：\n\n"
+        "**无法提交！以下模块存在未答、全选了“同等重要” 或 逻辑冲突（CR ≥ 0.1），请返回上方进行修改：**\n\n"
         + "\n".join(f"- {t}" for t in failed_titles)
     )
 
 if not name_filled:
-    st.info("请填写专家姓名后再提交问卷。")
+    st.info("请在问卷顶部填写专家姓名后再提交。")
 
 can_submit = name_filled and len(failed_titles) == 0
 
-if st.button("✅ 完成问卷提交", disabled=not can_submit, type="primary"):
+if st.button("✅ 完成问卷提交", disabled=not can_submit, type="primary", use_container_width=True):
     save_submission(expert_name.strip(), ROUND_NO, matrices_data, cr_results)
     st.balloons()
     st.success("感谢您的专业参与，数据已成功记录！")
 
 if not can_submit:
-    st.caption("（提交按钮在所有条件满足前保持禁用状态：姓名已填写 且 全部判断矩阵一致性检验通过）")
+    st.caption("（提交按钮在所有条件满足前保持禁用状态：姓名已填 且 全部矩阵均已有效打分并校验通过）")
 
 
 # ============================================================
-# 管理员数据导出（供课题组统计分析使用，非专家填写内容）
+# 管理员数据导出（课题组专用）
 # ============================================================
 with st.sidebar:
     st.subheader("数据管理（课题组专用）")
@@ -353,5 +413,6 @@ with st.sidebar:
                 file_name=f"ahp_responses_round{ROUND_NO}.csv",
                 mime="text/csv",
             )
+            st.caption("注：导出的JSON数据内已直接生成 `matrix` 格式，可直接供算法读入做权重计算。") [source: 1]
     elif passcode:
         st.error("口令错误")
