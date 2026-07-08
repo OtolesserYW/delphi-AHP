@@ -111,6 +111,11 @@ st.markdown(f"""
         margin-top: 36px;
         margin-bottom: 8px;
     }}
+
+    /* ---- 新增：放大所有按钮（验证按钮、提交按钮等）的文字字号 ---- */
+    div.stButton button p {
+        font-size: 20px !important;    /* 目标字号，可根据需要调整（如 22px） */
+    }
 </style>
 """, unsafe_allow_html=True)
 
