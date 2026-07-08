@@ -139,8 +139,8 @@ st.markdown(f"""
 # ============================================================
 ROUND_NO = 3                      # 当前为第三轮专家咨询
 FIXED_DATE_STR = "2026年7月7日"    # 第三轮统一填表日期
-USER_PASSCODE = "expert2026"      # 专家查看与填写问卷的专属口令（新增）
-ADMIN_PASSCODE = "admin123"       # 管理员导出数据口令
+USER_PASSCODE = "grxzybl2026"      # 专家查看与填写问卷的专属口令（新增）
+ADMIN_PASSCODE = "syw0606"       # 管理员导出数据口令
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
