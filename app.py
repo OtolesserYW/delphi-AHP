@@ -149,6 +149,25 @@ st.markdown(f"""
     div[data-baseweb="popover"]:not(:has([role="option"])) {{
         display: none !important;
     }}
+
+    /* 👇 刚刚替换的：高层级 + 医疗绿按钮样式 👇 */
+    div[data-testid="stExpander"] button[kind="primary"] {{
+        position: relative !important;
+        z-index: 999999 !important;
+        background-color: #0f766e !important;
+        border-color: #0f766e !important;
+        color: white !important;
+    }}
+    div[data-testid="stExpander"] button[kind="primary"]:hover {{
+        background-color: #115e59 !important;
+        border-color: #115e59 !important;
+        color: white !important;
+    }}
+    div[data-testid="stExpander"] button[kind="primary"]:active {{
+        background-color: #134e4a !important;
+        border-color: #134e4a !important;
+    }}
+    
 </style>
 """, unsafe_allow_html=True)
 
