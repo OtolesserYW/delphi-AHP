@@ -8,52 +8,111 @@ import pandas as pd
 import streamlit as st
 
 # ============================================================
-# 强行重写底层主题颜色 (彻底干掉鲜红，改为深海蓝)
+# 页面配置与统一视觉规范
 # ============================================================
 # 注意：配置必须是 Streamlit 命令的第一句
 st.set_page_config(page_title="医护人员感染性职业暴露风险评估——专家AHP问卷", layout="centered")
 
-# 通过设置全局 CSS 强行放大滑动条上方的当前值提示文字（如 1 (同等重要)）
-st.markdown("""
+# ---------- 配色规范 ----------
+# ACCENT：仅用于交互元素（滑块当前值、卡片强调边、按钮），不用于大段文字
+# TEXT_DARK：指标名称、标题正文颜色——与滑块的蓝色区分开
+# TEXT_MUTED：VS分隔符、刻度提示等次要文字颜色
+ACCENT_COLOR = "#1f77b4"
+TEXT_DARK = "#1e293b"
+TEXT_MUTED = "#64748b"
+
+# 动态覆盖 Streamlit 的主题色（滑块/按钮的蓝色）
+st.config.set_option("theme.primaryColor", ACCENT_COLOR)
+
+# 说明：经核对 Streamlit 前端源码，select_slider 的当前取值气泡与两端刻度文字
+# 实际对应的 data-testid 分别是 stSliderThumbValue 与 stSliderTickBar（并不存在
+# stSelectSlider 这个 testid），此前的选择器写错了目标元素所以完全没生效——
+# 这里改用真实存在的 testid，两处均按你的要求统一放大到 18px。
+st.markdown(f"""
 <style>
-    /* 调整全局普通文本（如说明、含义等）的字体大小和行距 */
-    .stMarkdown p, .stMarkdown li {
+    html, body, [class*="css"] {{
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }}
+
+    /* 正文段落 / 列表：统一字号与行距 */
+    .stMarkdown p, .stMarkdown li {{
+        font-size: 17px !important;
+        line-height: 1.75 !important;
+        color: #334155;
+    }}
+
+    /* 折叠面板（指标含义说明）内文字与标题 */
+    .streamlit-expanderContent p, .streamlit-expanderContent li {{
+        font-size: 17px !important;
+        line-height: 1.7 !important;
+    }}
+    div[data-testid="stExpander"] summary p {{
+        font-size: 17px !important;
+        font-weight: 600 !important;
+        color: {TEXT_DARK} !important;
+    }}
+
+    /* “### 一、填表说明” 等大段标题，统一样式并与其余标题拉开层级 */
+    .stMarkdown h3 {{
+        font-size: 26px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        border-left: 5px solid {ACCENT_COLOR};
+        padding-left: 14px;
+        margin-top: 42px !important;
+        margin-bottom: 18px !important;
+    }}
+
+    /* “我确认这组指标确实同等重要”复选框文字 */
+    div[data-testid="stCheckbox"] label p {{
+        font-size: 19px !important;
+        font-weight: 600 !important;
+        color: {TEXT_DARK} !important;
+    }}
+
+    /* 原生提示框（success/warning/info/error）文字统一大小，避免和自定义提示框不一致 */
+    div[data-testid^="stAlertContent"] p {{
+        font-size: 17px !important;
+        line-height: 1.6 !important;
+    }}
+
+    /* ---- 滑块：当前取值气泡（如“1 (同等重要)”）与两端刻度（左9…右9）统一放大到 18px ---- */
+    div[data-testid="stSliderThumbValue"] {{
         font-size: 18px !important;
-        line-height: 1.5 !important;
-    }
-    /* 调整折叠面板内文字大小 */
-    .streamlit-expanderContent p {
+        font-weight: 700 !important;
+        color: {ACCENT_COLOR} !important;
+    }}
+    div[data-testid="stSliderTickBar"] > * {{
         font-size: 18px !important;
-        line-height: 1.5 !important;
-    }
-    
-    /* 放大并加粗“我确认这组指标确实同等重要”复选框的文字 */
-    div[data-testid="stCheckbox"] label p {
-        font-size: 20px !important;
-        font-weight: bold !important;
-        color: #2c3e50 !important;
-    }
-    
-    /* 【核心放大】强制将滑动条上方红色的当前选中值（如 1 同等重要）放大到 22px 粗体 */
-    div[data-testid="stSelectSlider"] [data-testid="stWidgetLabel"] + div div div {
-        font-size: 22px !important;
-        font-weight: bold !important;
-    }
-    div[data-testid="stSelectSlider"] span[data-baseweb="typography"] {
-        font-size: 22px !important;
-        font-weight: bold !important;
-    }
-    
-    /* 底部各个固定档位小刻度（如左9...1...右9）的大小保持20px，防止喧宾夺主 */
-    div[data-testid="stSelectSlider"] div[data-baseweb="slider"] + div span {
-        font-size: 20px !important;
-        color: #555555 !important;
-    }
+        font-weight: 500 !important;
+        color: {TEXT_MUTED} !important;
+    }}
+
+    /* 指标对比行文字：与滑块的蓝色区分开，字号略微放大 */
+    .ahp-item-name {{
+        font-size: 21px;
+        font-weight: 700;
+        color: {TEXT_DARK};
+    }}
+    .ahp-vs-label {{
+        font-size: 15px;
+        font-weight: 600;
+        color: {TEXT_MUTED};
+        letter-spacing: 1px;
+    }}
+
+    /* 分组小标题（“总目标…的下属指标对比” / “A1.病原体基础属性 的下属指标对比”等） */
+    .ahp-group-title {{
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+        border-left: 5px solid {ACCENT_COLOR};
+        padding-left: 12px;
+        margin-top: 36px;
+        margin-bottom: 8px;
+    }}
 </style>
 """, unsafe_allow_html=True)
-
-# 动态覆盖 Streamlit 的配置参数，彻底完成“去红染蓝”
-st.config.set_option("theme.primaryColor", "#1f77b4")
 
 
 # ============================================================
@@ -254,7 +313,7 @@ LEVEL3_DEFS = {
 # 矩阵 UI 生成器
 # ============================================================
 def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = None):
-    st.markdown(f"<h3 style='color: #1f77b4; font-size: 24px; margin-top: 30px;'>{parent_title} 的下属指标对比</h3>", unsafe_allow_html=True)
+    st.markdown(f"<div class='ahp-group-title'>{parent_title} 的下属指标对比</div>", unsafe_allow_html=True)
 
     if defs:
         with st.expander("📖 点击查看指标包含内容或含义说明"):
@@ -268,25 +327,26 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
 
     for i in range(n):
         for j in range(i + 1, n):
-            st.markdown(f"""
-            <div style='display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 5px;'>
-                <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: right; width: 45%;'>{items[i]}</div>
-                <div style='font-size: 18px; font-weight: bold; color: #888; text-align: center; width: 10%;'> VS </div>
-                <div style='font-size: 18px; font-weight: bold; color: #1f77b4; text-align: left; width: 45%;'>{items[j]}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown(f"""
+                <div style='display: flex; justify-content: center; align-items: center; margin-bottom: 6px;'>
+                    <div class='ahp-item-name' style='text-align: right; width: 44%;'>{items[i]}</div>
+                    <div class='ahp-vs-label' style='text-align: center; width: 12%;'>VS</div>
+                    <div class='ahp-item-name' style='text-align: left; width: 44%;'>{items[j]}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-            choice = st.select_slider(
-                "请滑动选择相对重要程度",
-                options=SLIDER_OPTIONS,
-                value="1 (同等重要)",
-                key=f"{matrix_key}_{i}_{j}",
-                label_visibility="collapsed"
-            )
-            
+                choice = st.select_slider(
+                    "请滑动选择相对重要程度",
+                    options=SLIDER_OPTIONS,
+                    value="1 (同等重要)",
+                    key=f"{matrix_key}_{i}_{j}",
+                    label_visibility="collapsed"
+                )
+
             if choice != "1 (同等重要)":
                 all_default = False
-                
+
             val = option_to_value(choice)
             matrix[i, j] = val
             matrix[j, i] = 1 / val
