@@ -79,7 +79,7 @@ st.markdown(f"""
     /* ---- 滑块：当前取值气泡（如“1 (同等重要)”）与两端刻度（左9…右9）统一放大到 18px ---- */
     div[data-testid="stSliderThumbValue"] {{
         font-size: 18px !important;
-        font-weight: 700 !important;
+        font-weight: 400 !important;
         color: {ACCENT_COLOR} !important;
     }}
     div[data-testid="stSliderTickBar"] > * {{
