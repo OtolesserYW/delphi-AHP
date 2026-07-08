@@ -150,22 +150,27 @@ st.markdown(f"""
         display: none !important;
     }}
 
-    /* 👇 刚刚替换的：高层级 + 医疗绿按钮样式 👇 */
+    /* ---- 优化：换成温润不刺眼的暖琥珀金 ---- */
+    /* 1. 默认状态：典雅的琥珀金（降低了饱和度，护眼） */
     div[data-testid="stExpander"] button[kind="primary"] {{
         position: relative !important;
         z-index: 999999 !important;
-        background-color: #f97316 !important;
-        border-color: #f97316 !important;
+        background-color: #d97706 !important; 
+        border-color: #d97706 !important;
         color: white !important;
     }}
+    
+    /* 2. 鼠标悬浮状态：温和沉稳的暗金 */
     div[data-testid="stExpander"] button[kind="primary"]:hover {{
-        background-color: #115e59 !important;
-        border-color: #115e59 !important;
+        background-color: #b45309 !important; 
+        border-color: #b45309 !important;
         color: white !important;
     }}
+    
+    /* 3. 鼠标按下状态 */
     div[data-testid="stExpander"] button[kind="primary"]:active {{
-        background-color: #134e4a !important;
-        border-color: #134e4a !important;
+        background-color: #92400e !important;
+        border-color: #92400e !important;
     }}
     
 </style>
