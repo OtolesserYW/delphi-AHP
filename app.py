@@ -145,11 +145,9 @@ st.markdown(f"""
         font-size: 18px !important;
     }}
 
-    /* ---- 新增：彻底修复辅助工具按钮需要点击两次的 Bug ---- */
-    /* 强行让折叠面板内的按钮拥有最高物理层级，穿透一切隐形遮罩 */
-    div[data-testid="stExpander"] button {{
-        position: relative !important;
-        z-index: 999999 !important;
+   /* ---- 新增：当选项全选后，彻底隐藏“No results”无用大白框 ---- */
+    div[data-baseweb="popover"]:not(:has(li)) {{
+        display: none !important;
     }}
 </style>
 """, unsafe_allow_html=True)
