@@ -145,8 +145,8 @@ st.markdown(f"""
         font-size: 18px !important;
     }}
 
-   /* ---- 新增：当选项全选后，彻底隐藏“No results”无用大白框 ---- */
-    div[data-baseweb="popover"]:not(:has(li)) {{
+/* ---- 终极修复：通过检测真正选项(role=option)来彻底抹除 No results 弹窗 ---- */
+    div[data-baseweb="popover"]:not(:has([role="option"])) {{
         display: none !important;
     }}
 </style>
