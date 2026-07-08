@@ -126,6 +126,27 @@ st.markdown(f"""
     div[data-testid="stTextInput"] input::placeholder {{
         font-size: 18px !important;
     }}
+
+    /* ---- 新增：放大辅助排序工具（多选框）的所有相关字体到 18px ---- */
+    /* 1. 放大上方的提示标题 */
+    div[data-testid="stMultiSelect"] label p {{
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #1e293b !important;
+    }}
+    
+    /* 2. 放大框内的占位符（"请依次点击..."）和选中的标签文字 */
+    div[data-testid="stMultiSelect"] span {{
+        font-size: 18px !important;
+    }}
+    
+    /* 3. 放大点击展开后的下拉列表选项文字（兼容 Streamlit 底层组件） */
+    div[data-baseweb="popover"] li {{
+        font-size: 18px !important;
+    }}
+    div[data-baseweb="popover"] span {{
+        font-size: 18px !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
