@@ -127,7 +127,7 @@ st.markdown(f"""
         font-size: 18px !important;
     }}
 
-    /* ---- 新增：放大辅助排序工具（多选框）的所有相关字体到 18px ---- */
+/* ---- 强化版：把多选框的标签、内部提示词、下拉项全部放大到 18px ---- */
     /* 1. 放大上方的提示标题 */
     div[data-testid="stMultiSelect"] label p {{
         font-size: 18px !important;
@@ -135,18 +135,16 @@ st.markdown(f"""
         color: #1e293b !important;
     }}
     
-    /* 2. 放大框内的占位符（"请依次点击..."）和选中的标签文字 */
-    div[data-testid="stMultiSelect"] span {{
+    /* 2. 核心：穿透锁定输入框内部的所有文本（包含您截图中的“请依次点击...”提示词、以及选中的标签） */
+    div[data-testid="stMultiSelect"] [data-baseweb="select"] * {{
         font-size: 18px !important;
     }}
     
-    /* 3. 放大点击展开后的下拉列表选项文字（兼容 Streamlit 底层组件） */
-    div[data-baseweb="popover"] li {{
+    /* 3. 放大点击展开后的下拉列表选项文字 */
+    div[data-baseweb="popover"] li * {{
         font-size: 18px !important;
     }}
-    div[data-baseweb="popover"] span {{
-        font-size: 18px !important;
-    }}
+    
 </style>
 """, unsafe_allow_html=True)
 
