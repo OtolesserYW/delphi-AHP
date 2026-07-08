@@ -144,7 +144,13 @@ st.markdown(f"""
     div[data-baseweb="popover"] li * {{
         font-size: 18px !important;
     }}
-    
+
+    /* ---- 新增：彻底修复辅助工具按钮需要点击两次的 Bug ---- */
+    /* 强行让折叠面板内的按钮拥有最高物理层级，穿透一切隐形遮罩 */
+    div[data-testid="stExpander"] button {{
+        position: relative !important;
+        z-index: 999999 !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
