@@ -154,8 +154,8 @@ st.markdown(f"""
     div[data-testid="stExpander"] button[kind="primary"] {{
         position: relative !important;
         z-index: 999999 !important;
-        background-color: #0f766e !important;
-        border-color: #0f766e !important;
+        background-color: #f97316 !important;
+        border-color: #f97316 !important;
         color: white !important;
     }}
     div[data-testid="stExpander"] button[kind="primary"]:hover {{
