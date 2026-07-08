@@ -2,7 +2,7 @@ import os
 import json
 import sqlite3
 from datetime import datetime, timezone, timedelta
-
+beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -221,7 +221,7 @@ def save_submission(expert_name: str, round_no: int, matrices_data: dict, cr_dat
         (
             expert_name,
             round_no,
-            beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S"),
+            beijing_time,
             json.dumps(matrices_data, ensure_ascii=False),
             json.dumps(cr_data, ensure_ascii=False),
         ),
