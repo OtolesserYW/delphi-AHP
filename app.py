@@ -1,6 +1,6 @@
 import os
 import json
-import sqlite3
+from sqlalchemy import text
 from datetime import datetime, timezone, timedelta
 beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
 import numpy as np
