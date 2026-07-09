@@ -2,7 +2,6 @@ import os
 import json
 from sqlalchemy import text
 from datetime import datetime, timezone, timedelta
-beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -182,44 +181,67 @@ st.markdown(f"""
 # ============================================================
 ROUND_NO = 3                      # 当前为第三轮专家咨询
 FIXED_DATE_STR = "2026年7月7日"    # 第三轮统一填表日期
-USER_PASSCODE = "grxzybl2026"      # 专家查看与填写问卷的专属口令（新增）
+USER_PASSCODE = "grxzybl2026"      # 专家查看与填写问卷的专属口令
 ADMIN_PASSCODE = "syw0606"       # 管理员导出数据口令
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
-DB_PATH = os.path.join(DATA_DIR, "ahp_responses.db")
-
-# ==========================================
-# 新的永久云端数据库提交逻辑
-# ==========================================
-# 1. 连接云端数据库
+# ============================================================
+# 云端数据库连接（Postgres，跨部署持久化存储）
+# ============================================================
+# 需要在 Streamlit Cloud 的 "App settings → Secrets" 中配置：
+#
+# [connections.postgresql]
+# dialect = "postgresql"
+# host = "你的数据库host"
+# port = 5432
+# database = "你的数据库名"
+# username = "你的用户名"
+# password = "你的密码"
+#
+# 没配置这段 secrets 的话，下面 st.connection(...) 会在应用运行时报错
+# （这是"Error running app"，和现在的"Error installing requirements"是两回事）。
 conn = st.connection("postgresql", type="sql")
 
-# 2. 准备北京时间 (如果您之前已经写了这行，就保留)
-beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
 
-# 3. 提交数据
-try:
+def init_db_pg():
     with conn.session as s:
-        # 使用 SQLAlchemy 的安全插入语法
-        sql = text("""
-            INSERT INTO submissions (expert_name, round_no, submit_time, matrices_json, cr_json) 
-            VALUES (:expert_name, :round_no, :submit_time, :matrices_json, :cr_json)
-        """)
-        s.execute(sql, {
-            "expert_name": expert_name,
-            "round_no": round_no,
-            "submit_time": beijing_time,
-            "matrices_json": json.dumps(matrices_data, ensure_ascii=False),
-            "cr_json": json.dumps(cr_data, ensure_ascii=False)
-        })
-        s.commit() # 必须 commit 才会真正保存
-        
-    st.success("🎉 提交成功！您的数据已安全加密并永久保存至云端，感谢您的支持！")
-    
-except Exception as e:
-    st.error(f"❌ 提交失败，发生网络错误。错误代码: {e}")
+        s.execute(text("""
+            CREATE TABLE IF NOT EXISTS submissions (
+                id SERIAL PRIMARY KEY,
+                expert_name TEXT NOT NULL,
+                round_no INTEGER NOT NULL,
+                submit_time TEXT NOT NULL,
+                matrices_json TEXT NOT NULL,
+                cr_json TEXT NOT NULL
+            )
+        """))
+        s.commit()
+
+
+def save_submission(expert_name: str, round_no: int, matrices_data: dict, cr_data: dict):
+    """仅在专家点击提交按钮时调用，而不是在脚本每次运行时都执行。"""
+    beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+    with conn.session as s:
+        s.execute(
+            text("""
+                INSERT INTO submissions (expert_name, round_no, submit_time, matrices_json, cr_json)
+                VALUES (:expert_name, :round_no, :submit_time, :matrices_json, :cr_json)
+            """),
+            {
+                "expert_name": expert_name,
+                "round_no": round_no,
+                "submit_time": beijing_time,
+                "matrices_json": json.dumps(matrices_data, ensure_ascii=False),
+                "cr_json": json.dumps(cr_data, ensure_ascii=False),
+            },
+        )
+        s.commit()
+
+
+def load_all_submissions() -> pd.DataFrame:
+    return conn.query("SELECT * FROM submissions ORDER BY id", ttl=0)
+
+
+init_db_pg()
 
 
 # ============================================================
@@ -506,7 +528,7 @@ if not st.session_state["user_authenticated"]:
         
         input_pass = st.text_input("访问口令", type="password", label_visibility="collapsed", placeholder="请在此输入访问口令...")
         
-        if st.button("验证并进入问卷", type="primary", use_container_width=True):
+        if st.button("验证并进入问卷", type="primary", width="stretch"):
             if input_pass == USER_PASSCODE:
                 st.session_state["user_authenticated"] = True
                 st.rerun()
@@ -630,33 +652,31 @@ if failed_titles:
 
 can_submit = name_filled and len(failed_titles) == 0
 
-if st.button("✅ 完成问卷提交", disabled=not can_submit, type="primary", use_container_width=True):
-    save_submission(expert_name.strip(), ROUND_NO, matrices_data, cr_results)
-    st.balloons()
-    st.success("感谢您的专业参与，数据已成功记录！")
+if st.button("✅ 完成问卷提交", disabled=not can_submit, type="primary", width="stretch"):
+    try:
+        save_submission(expert_name.strip(), ROUND_NO, matrices_data, cr_results)
+        st.balloons()
+        st.success("🎉 提交成功！您的数据已安全保存至云端，感谢您的专业参与！")
+    except Exception as e:
+        st.error(f"❌ 提交失败，数据库连接出现问题，请稍后重试或联系课题组。（错误信息：{e}）")
 
 with st.sidebar:
     st.subheader("数据管理（课题组专用）")
     passcode = st.text_input("管理员口令", type="password", key="admin_passcode")
     if passcode == ADMIN_PASSCODE:
-        df = load_all_submissions()
-        st.write(f"已收集 {len(df)} 份有效问卷")
-        st.dataframe(df[["id", "expert_name", "round_no", "submit_time"]], use_container_width=True)
-        if len(df) > 0:
-            csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                # 1. 从您的云端数据库 (Supabase) 拉取所有提交的数据
-                df = conn.query("SELECT * FROM submissions")
-                
-                # 2. 将拉取下来的表格数据转换成带 BOM 的 UTF-8 编码的 CSV 字节流
-                # (加入 'utf-8-sig' 是为了保证用中文版 Excel 打开时绝对不会乱码)
-                csv_bytes = df.to_csv(index=False).encode('utf-8-sig')
-
-                # 3. 生成下载按钮 (这里就用到了您发的那段代码)
-            st.download_button(
-                label="📥 一键下载云端最新问卷数据",
-                data=csv_bytes, 
-                file_name=f"ahp_responses_round{ROUND_NO}.csv", 
-                mime="text/csv"
+        try:
+            df = load_all_submissions()
+            st.write(f"已收集 {len(df)} 份有效问卷")
+            st.dataframe(df[["id", "expert_name", "round_no", "submit_time"]], width="stretch")
+            if len(df) > 0:
+                csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    label="📥 一键下载云端最新问卷数据",
+                    data=csv_bytes,
+                    file_name=f"ahp_responses_round{ROUND_NO}.csv",
+                    mime="text/csv",
                 )
-            )
+        except Exception as e:
+            st.error(f"读取数据库失败：{e}")
+    elif passcode:
+        st.error("口令错误")

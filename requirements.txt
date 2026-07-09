@@ -1,4 +1,5 @@
 streamlit
 numpy
-SQLAlchemy==2.0.25
-psycopg2-binary==2.9.9
+pandas
+sqlalchemy
+psycopg2-binary
