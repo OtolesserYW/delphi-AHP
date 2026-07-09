@@ -190,52 +190,37 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "ahp_responses.db")
 
+# ==========================================
+# 新的永久云端数据库提交逻辑
+# ==========================================
+# 1. 连接云端数据库
+conn = st.connection("postgresql", type="sql")
 
-# ============================================================
-# 数据库：初始化与读写
-# ============================================================
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS submissions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            expert_name TEXT NOT NULL,
-            round_no INTEGER NOT NULL,
-            submit_time TEXT NOT NULL,
-            matrices_json TEXT NOT NULL,
-            cr_json TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+# 2. 准备北京时间 (如果您之前已经写了这行，就保留)
+beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
 
-def save_submission(expert_name: str, round_no: int, matrices_data: dict, cr_data: dict):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO submissions (expert_name, round_no, submit_time, matrices_json, cr_json) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (
-            expert_name,
-            round_no,
-            beijing_time,
-            json.dumps(matrices_data, ensure_ascii=False),
-            json.dumps(cr_data, ensure_ascii=False),
-        ),
-    )
-    conn.commit()
-    conn.close()
+# 3. 提交数据
+try:
+    with conn.session as s:
+        # 使用 SQLAlchemy 的安全插入语法
+        sql = text("""
+            INSERT INTO submissions (expert_name, round_no, submit_time, matrices_json, cr_json) 
+            VALUES (:expert_name, :round_no, :submit_time, :matrices_json, :cr_json)
+        """)
+        s.execute(sql, {
+            "expert_name": expert_name,
+            "round_no": round_no,
+            "submit_time": beijing_time,
+            "matrices_json": json.dumps(matrices_data, ensure_ascii=False),
+            "cr_json": json.dumps(cr_data, ensure_ascii=False)
+        })
+        s.commit() # 必须 commit 才会真正保存
+        
+    st.success("🎉 提交成功！您的数据已安全加密并永久保存至云端，感谢您的支持！")
+    
+except Exception as e:
+    st.error(f"❌ 提交失败，发生网络错误。错误代码: {e}")
 
-def load_all_submissions() -> pd.DataFrame:
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id", conn)
-    conn.close()
-    return df
-
-init_db()
 
 # ============================================================
 # AHP 计算与排序转化辅助组件
@@ -660,6 +645,18 @@ with st.sidebar:
         if len(df) > 0:
             csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
-                "⬇️ 下载原始数据（CSV）",
-                data=csv_bytes, file_name=f"ahp_responses_round{ROUND_NO}.csv", mime="text/csv"
+                # 1. 从您的云端数据库 (Supabase) 拉取所有提交的数据
+                df = conn.query("SELECT * FROM submissions")
+                
+                # 2. 将拉取下来的表格数据转换成带 BOM 的 UTF-8 编码的 CSV 字节流
+                # (加入 'utf-8-sig' 是为了保证用中文版 Excel 打开时绝对不会乱码)
+                csv_bytes = df.to_csv(index=False).encode('utf-8-sig')
+
+                # 3. 生成下载按钮 (这里就用到了您发的那段代码)
+            st.download_button(
+                label="📥 一键下载云端最新问卷数据",
+                data=csv_bytes, 
+                file_name=f"ahp_responses_round{ROUND_NO}.csv", 
+                mime="text/csv"
+                )
             )
