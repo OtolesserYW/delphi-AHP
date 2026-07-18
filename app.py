@@ -1,10 +1,13 @@
 import os
+import io
 import json
 from sqlalchemy import text
 from datetime import datetime, timezone, timedelta
 import numpy as np
 import pandas as pd
 import streamlit as st
+
+from analyze_ahp import build_workbook
 
 # ============================================================
 # 页面配置与统一视觉规范
@@ -671,11 +674,35 @@ with st.sidebar:
             if len(df) > 0:
                 csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
-                    label="📥 一键下载云端最新问卷数据",
+                    label="📥 一键下载云端最新问卷数据（原始CSV）",
                     data=csv_bytes,
                     file_name=f"ahp_responses_round{ROUND_NO}.csv",
                     mime="text/csv",
                 )
+
+                st.markdown("---")
+                st.caption(
+                    "生成前建议先确认：所有已收集问卷的判断矩阵一致性(CR)均已达标，"
+                    "否则计算出的权重仅供参考。"
+                )
+                if st.button("📊 生成AHP权重分析报告(Excel)", width="stretch"):
+                    try:
+                        with st.spinner("正在按行几何平均法计算各级权重，生成Excel..."):
+                            wb = build_workbook(df)
+                            buf = io.BytesIO()
+                            wb.save(buf)
+                            st.session_state["ahp_report_bytes"] = buf.getvalue()
+                        st.success("✅ 报告生成完成，请点击下方按钮下载")
+                    except Exception as e:
+                        st.error(f"❌ 报告生成失败：{e}")
+
+                if "ahp_report_bytes" in st.session_state:
+                    st.download_button(
+                        label="📥 下载AHP权重分析结果.xlsx",
+                        data=st.session_state["ahp_report_bytes"],
+                        file_name=f"AHP权重分析结果_round{ROUND_NO}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
         except Exception as e:
             st.error(f"读取数据库失败：{e}")
     elif passcode:
