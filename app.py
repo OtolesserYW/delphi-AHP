@@ -6,8 +6,8 @@ from datetime import datetime, timezone, timedelta
 import numpy as np
 import pandas as pd
 import streamlit as st
-
 from analyze_ahp import build_workbook
+
 
 # ============================================================
 # 页面配置与统一视觉规范
@@ -512,10 +512,13 @@ def matrix_input(matrix_key: str, parent_title: str, items: list, defs: list = N
 
 
 # ============================================================
-# 专家访问权限验证（拦截器）
+# 专家访问权限验证
 # ============================================================
 if "user_authenticated" not in st.session_state:
     st.session_state["user_authenticated"] = False
+    
+if "is_submitted" not in st.session_state:
+    st.session_state["is_submitted"] = False
 
 if not st.session_state["user_authenticated"]:
     st.markdown("<div style='margin-top: 60px;'></div>", unsafe_allow_html=True)
@@ -544,125 +547,138 @@ if not st.session_state["user_authenticated"]:
 # ============================================================
 # 页面主体 (通过验证后方能渲染)
 # ============================================================
+if not st.session_state["is_submitted"]:
+    
+    # --- 开头语 ---
+    st.markdown("""
+    <h1 style='text-align: center; font-size: 32px;'>医护人员感染性职业暴露风险评估体系构建</h1>
+    <h2 style='text-align: center; font-size: 24px; color: #555;'>——层次分析法（AHP）专家咨询问卷</h2>
 
-# --- 开头语 ---
-st.markdown("""
-<h1 style='text-align: center; font-size: 32px;'>医护人员感染性职业暴露风险评估体系构建</h1>
-<h2 style='text-align: center; font-size: 24px; color: #555;'>——层次分析法（AHP）专家咨询问卷</h2>
+    **尊敬的专家：**
 
-**尊敬的专家：**
+    您好！首先向您在百忙之中抽出时间继续参与调查表示衷心的感谢！
 
-您好！首先向您在百忙之中抽出时间继续参与调查表示衷心的感谢！
+    经二轮专家函询，本课题组已确立了由“病原体与相应疾病风险特征（A）”“环境暴露风险（B）”“个体风险与健康基础（C）”3个一级指标、12个二级指标及39个三级指标组成的三级评价指标体系。为进一步确定各层级指标在风险评估中的相对重要程度（权重），本课题拟采用层次分析法，邀请您根据自身的专业知识与临床实践经验，对同一上级指标下的各指标进行两两比较判断。
 
-经二轮专家函询，本课题组已确立了由“病原体与相应疾病风险特征（A）”“环境暴露风险（B）”“个体风险与健康基础（C）”3个一级指标、12个二级指标及39个三级指标组成的三级评价指标体系。为进一步确定各层级指标在风险评估中的相对重要程度（权重），本课题拟采用层次分析法，邀请您根据自身的专业知识与临床实践经验，对同一上级指标下的各指标进行两两比较判断。
+    您的专业背景与丰富经验对本研究的科学性、实用性至关重要，恳请您结合实际工作情况，独立、审慎地填写本问卷。填写过程中如对指标含义存有疑问，请参见折叠面板中的“指标含义说明”。本问卷所填写内容仅用于本课题之学术研究，数据将进行匿名化处理，不作其他任何用途，请您放心填写。
 
-您的专业背景与丰富经验对本研究的科学性、实用性至关重要，恳请您结合实际工作情况，独立、审慎地填写本问卷。填写过程中如对指标含义存有疑问，请参见折叠面板中的“指标含义说明”。本问卷所填写内容仅用于本课题之学术研究，数据将进行匿名化处理，不作其他任何用途，请您放心填写。
+    再次感谢您的大力支持与悉心指导！  
+    <div style='text-align: right; font-weight: bold; font-size: 18px; line-height: 1.6;'>
+        课题组敬上<br>
+        2026年7月7日
+    </div>
+    """, unsafe_allow_html=True)
+    st.divider()
 
-再次感谢您的大力支持与悉心指导！  
-<div style='text-align: right; font-weight: bold; font-size: 18px; line-height: 1.6;'>
-    课题组敬上<br>
-    2026年7月7日
-</div>
-""", unsafe_allow_html=True)
-st.divider()
+    # --- 专家基本信息 ---
+    st.subheader("专家基本信息")
+    expert_name = st.text_input("专家姓名 *", key="expert_name", placeholder="请输入您的姓名")
+    st.caption(f"日期：{FIXED_DATE_STR}（第 {ROUND_NO} 轮专家咨询）")
+    st.divider()
 
-# --- 专家基本信息 ---
-st.subheader("专家基本信息")
-expert_name = st.text_input("专家姓名 *", key="expert_name", placeholder="请输入您的姓名")
-st.caption(f"日期：{FIXED_DATE_STR}（第 {ROUND_NO} 轮专家咨询）")
-st.divider()
+    # --- 填表说明 ---
+    st.markdown("""
+    ### 一、填表说明
+    1. 本问卷需要您对隶属于同一上级指标的各指标，两两比较其相对重要程度。
+    2. **判断标度说明**：采用国际通用的 1—9 标度法。
+       - **1 (同等重要)**：表示两个指标相比，具有同样重要性。
+       - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要.
+       - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要.
+       - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要.
+       - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要.
+       - **2、4、6、8**：表示上述相邻判断的中间值。
+    3. **填写方法（重要⭐）**：我们使用了左右平衡滑块。滑动条停留在中间（1）代表两者**同等重要**。若您认为**左侧**指标比**右侧**重要，请向**左**滑动；若认为**右侧**指标比**左侧**重要，请向**右**滑动。数字越大代表重要程度差异越显著。
+       - 例如：“左侧 VS 右侧”的比较中，如果将滑块拖至 **“左3(稍重要)”**，代表：**左侧指标比右侧指标稍微重要**。
+    4. 请您结合临床实际及个人专业经验独立判断；如某组指标数量较多、判断确有困难，可优先比较差异明显的指标对，再逐一补齐其余。
+    """)
+    st.divider()
 
-# --- 填表说明 ---
-st.markdown("""
-### 一、填表说明
-1. 本问卷需要您对隶属于同一上级指标的各指标，两两比较其相对重要程度。
-2. **判断标度说明**：采用国际通用的 1—9 标度法。
-   - **1 (同等重要)**：表示两个指标相比，具有同样重要性。
-   - **3 (稍微重要)**：表示两个指标相比，前者比后者稍微重要.
-   - **5 (明显重要)**：表示两个指标相比，前者比后者明显重要.
-   - **7 (强烈重要)**：表示两个指标相比，前者比后者强烈重要.
-   - **9 (极端重要)**：表示两个指标相比，前者比后者极端重要.
-   - **2、4、6、8**：表示上述相邻判断的中间值。
-3. **填写方法（重要⭐）**：我们使用了左右平衡滑块。滑动条停留在中间（1）代表两者**同等重要**。若您认为**左侧**指标比**右侧**重要，请向**左**滑动；若认为**右侧**指标比**左侧**重要，请向**右**滑动。数字越大代表重要程度差异越显著。
-   - 例如：“左侧 VS 右侧”的比较中，如果将滑块拖至 **“左3(稍重要)”**，代表：**左侧指标比右侧指标稍微重要**。
-4. 请您结合临床实际及个人专业经验独立判断；如某组指标数量较多、判断确有困难，可优先比较差异明显的指标对，再逐一补齐其余。
-""")
-st.divider()
+    # --- 二、开始正式问卷 ---
+    st.markdown("### 二、判断矩阵调查表")
 
-# --- 二、开始正式问卷 ---
-st.markdown("### 二、判断矩阵调查表")
+    # 1. 一级指标
+    matrix_input("L1", "总目标（医护人员感染性职业暴露风险）", L1_ITEMS, L1_DEFS)
 
-# 1. 一级指标
-matrix_input("L1", "总目标（医护人员感染性职业暴露风险）", L1_ITEMS, L1_DEFS)
+    # 2. 二级指标
+    matrix_input("L2_A", "A.病原体与相应疾病风险特征", L2_A_ITEMS, L2_A_DEFS)
+    matrix_input("L2_B", "B.环境暴露风险", L2_B_ITEMS, L2_B_DEFS)
+    matrix_input("L2_C", "C.个体风险与健康基础", L2_C_ITEMS, L2_C_DEFS)
 
-# 2. 二级指标
-matrix_input("L2_A", "A.病原体与相应疾病风险特征", L2_A_ITEMS, L2_A_DEFS)
-matrix_input("L2_B", "B.环境暴露风险", L2_B_ITEMS, L2_B_DEFS)
-matrix_input("L2_C", "C.个体风险与健康基础", L2_C_ITEMS, L2_C_DEFS)
+    # 3. 三级指标 (A系列)
+    matrix_input("L3_A1", "A1.病原体基础属性", ["A1.1 病原体生物危害分级", "A1.2 病原谱构成", "A1.3 病原体载量"], LEVEL3_DEFS["L3_A1"])
+    matrix_input("L3_A2", "A2.病原体变异与进化潜力", ["A2.1 分子进化情况", "A2.2 遗传距离"], LEVEL3_DEFS["L3_A2"])
+    matrix_input("L3_A3", "A3.传播特性与潜力", ["A3.1 传播途径与多途径风险", "A3.2 基本传染数R0/有效传染数Re", "A3.3 无症状/潜伏期传播能力"], LEVEL3_DEFS["L3_A3"])
+    matrix_input("L3_A4", "A4.环境存活能力", ["A4.1 消杀敏感性", "A4.2 环境稳定性"], LEVEL3_DEFS["L3_A4"])
+    matrix_input("L3_A5", "A5.疾病临床严重性", ["A5.1 病例住院率", "A5.2 重症率", "A5.3 病死率"], LEVEL3_DEFS["L3_A5"])
+    matrix_input("L3_A6", "A6.临床防治有效性", ["A6.1 早期诊疗可行性", "A6.2 预防接种可及性与有效性", "A6.3 特异性治疗药物可及性与有效性", "A6.4 病原体耐药性"], LEVEL3_DEFS["L3_A6"])
 
-# 3. 三级指标 (A系列)
-matrix_input("L3_A1", "A1.病原体基础属性", ["A1.1 病原体生物危害分级", "A1.2 病原谱构成", "A1.3 病原体载量"], LEVEL3_DEFS["L3_A1"])
-matrix_input("L3_A2", "A2.病原体变异与进化潜力", ["A2.1 分子进化情况", "A2.2 遗传距离"], LEVEL3_DEFS["L3_A2"])
-matrix_input("L3_A3", "A3.传播特性与潜力", ["A3.1 传播途径与多途径风险", "A3.2 基本传染数R0/有效传染数Re", "A3.3 无症状/潜伏期传播能力"], LEVEL3_DEFS["L3_A3"])
-matrix_input("L3_A4", "A4.环境存活能力", ["A4.1 消杀敏感性", "A4.2 环境稳定性"], LEVEL3_DEFS["L3_A4"])
-matrix_input("L3_A5", "A5.疾病临床严重性", ["A5.1 病例住院率", "A5.2 重症率", "A5.3 病死率"], LEVEL3_DEFS["L3_A5"])
-matrix_input("L3_A6", "A6.临床防治有效性", ["A6.1 早期诊疗可行性", "A6.2 预防接种可及性与有效性", "A6.3 特异性治疗药物可及性与有效性", "A6.4 病原体耐药性"], LEVEL3_DEFS["L3_A6"])
+    # 4. 三级指标 (B与C系列)
+    matrix_input("L3_B1", "B1.布局与通风", ["B1.1 功能分区合理性", "B1.2 流线设置合理性", "B1.3 空气质量与气流组织", "B1.4 通风保障充分性"], LEVEL3_DEFS["L3_B1"])
+    matrix_input("L3_B2", "B2.感染者风险", ["B2.1 感染者行为可控性", "B2.2 感染者体液暴露风险", "B2.3 感染者集中度", "B2.4 感染者移动/转运"], LEVEL3_DEFS["L3_B2"])
+    matrix_input("L3_B3", "B3.物品与环境污染风险", ["B3.1 物资与环境表面污染风险", "B3.2 空气颗粒暴露风险", "B3.3 医疗废物传染风险", "B3.4 医疗器械与设备污染风险"], LEVEL3_DEFS["L3_B3"])
 
-# 4. 三级指标 (B与C系列)
-matrix_input("L3_B1", "B1.布局与通风", ["B1.1 功能分区合理性", "B1.2 流线设置合理性", "B1.3 空气质量与气流组织", "B1.4 通风保障充分性"], LEVEL3_DEFS["L3_B1"])
-matrix_input("L3_B2", "B2.感染者风险", ["B2.1 感染者行为可控性", "B2.2 感染者体液暴露风险", "B2.3 感染者集中度", "B2.4 感染者移动/转运"], LEVEL3_DEFS["L3_B2"])
-matrix_input("L3_B3", "B3.物品与环境污染风险", ["B3.1 物资与环境表面污染风险", "B3.2 空气颗粒暴露风险", "B3.3 医疗废物传染风险", "B3.4 医疗器械与设备污染风险"], LEVEL3_DEFS["L3_B3"])
+    matrix_input("L3_C1", "C1.工作场景暴露风险", ["C1.1 操作暴露风险", "C1.2 岗位暴露强度", "C1.3 工作场景暴露时间"], LEVEL3_DEFS["L3_C1"])
+    matrix_input("L3_C2", "C2.个体生理易感性", ["C2.1 基础健康状况", "C2.2 免疫能力"], LEVEL3_DEFS["L3_C2"])
+    matrix_input("L3_C3", "C3.个体防护装备的身体适配性", ["C3.1 尺寸匹配性", "C3.2 操作灵活性", "C3.3 舒适耐受性", "C3.4 个体特征适配性", "C3.5 基础健康适宜性"], LEVEL3_DEFS["L3_C3"])
 
-matrix_input("L3_C1", "C1.工作场景暴露风险", ["C1.1 操作暴露风险", "C1.2 岗位暴露强度", "C1.3 工作场景暴露时间"], LEVEL3_DEFS["L3_C1"])
-matrix_input("L3_C2", "C2.个体生理易感性", ["C2.1 基础健康状况", "C2.2 免疫能力"], LEVEL3_DEFS["L3_C2"])
-matrix_input("L3_C3", "C3.个体防护装备的身体适配性", ["C3.1 尺寸匹配性", "C3.2 操作灵活性", "C3.3 舒适耐受性", "C3.4 个体特征适配性", "C3.5 基础健康适宜性"], LEVEL3_DEFS["L3_C3"])
+    
+    # ============================================================
+    # 结束语
+    # ============================================================
+    st.markdown("""
+    ### 结束语
+    至此，本次问卷调查内容全部结束。衷心感谢您在繁忙的临床与科研工作之余，耐心、细致地完成本次两两比较判断！您所提供的专业判断，将通过层次分析法计算得出各级指标的权重系数，并结合一致性检验加以校核，为构建科学、合理的“医护人员感染性职业暴露风险评估指标体系”提供重要依据，对提升本院及同类专科医院医护人员职业防护水平具有切实意义。
 
+    若后续需要根据一致性检验结果对个别判断进行复核或修正，我们可能会再次与您联系，恳请您予以理解和支持。您的每一份意见都弥足珍贵，再次向您致以最诚挚的谢意！  
+    <div style='text-align: right; font-weight: bold; font-size: 18px; line-height: 1.6;'>
+        课题组 敬上<br>
+        2026年7月7日
+    </div>
+    """, unsafe_allow_html=True)
 
-# ============================================================
-# 结束语
-# ============================================================
-st.markdown("""
-### 结束语
-至此，本次问卷调查内容全部结束。衷心感谢您在繁忙的临床与科研工作之余，耐心、细致地完成本次两两比较判断！您所提供的专业判断，将通过层次分析法计算得出各级指标的权重系数，并结合一致性检验加以校核，为构建科学、合理的“医护人员感染性职业暴露风险评估指标体系”提供重要依据，对提升本院及同类专科医院医护人员职业防护水平具有切实意义。
+    # ============================================================
+    # 提交区与管理区
+    # ============================================================
+    st.markdown("---")
+    validity = st.session_state.get("validity", {})
+    matrices_data = st.session_state.get("matrices_data", {})
+    cr_results = st.session_state.get("cr_results", {})
 
-若后续需要根据一致性检验结果对个别判断进行复核或修正，我们可能会再次与您联系，恳请您予以理解和支持。您的每一份意见都弥足珍贵，再次向您致以最诚挚的谢意！  
-<div style='text-align: right; font-weight: bold; font-size: 18px; line-height: 1.6;'>
-    课题组 敬上<br>
-    2026年7月7日
-</div>
-""", unsafe_allow_html=True)
+    failed_titles = [matrices_data[k]["title"] for k, is_valid in validity.items() if not is_valid]
+    name_filled = bool(expert_name and expert_name.strip())
 
-# ============================================================
-# 提交区与管理区
-# ============================================================
-st.markdown("---")
-validity = st.session_state.get("validity", {})
-matrices_data = st.session_state.get("matrices_data", {})
-cr_results = st.session_state.get("cr_results", {})
+    if failed_titles:
+        st.markdown(
+            f"""
+            <div style='background-color: #fff4e5; color: #d97706; padding: 18px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; line-height: 1.5; margin-bottom: 20px;'>
+                <strong>⚠️ 无法提交！以下模块存在未答、需确认“同等重要” 或 逻辑冲突（CR ≥ 0.1），请返回上方修改或使用【辅助工具】：</strong><br><br>
+                   {"<br>".join(f"• {t}" for t in failed_titles)}
+            </div>
+            """, unsafe_allow_html=True
+        )
 
-failed_titles = [matrices_data[k]["title"] for k, is_valid in validity.items() if not is_valid]
-name_filled = bool(expert_name and expert_name.strip())
+    can_submit = name_filled and len(failed_titles) == 0
 
-if failed_titles:
-    st.markdown(
-        f"""
-        <div style='background-color: #fff4e5; color: #d97706; padding: 18px; border-radius: 8px; border: 1px solid #fde6d8; font-size: 18px; line-height: 1.5; margin-bottom: 20px;'>
-            <strong>⚠️ 无法提交！以下模块存在未答、需确认“同等重要” 或 逻辑冲突（CR ≥ 0.1），请返回上方修改或使用【辅助工具】：</strong><br><br>
-            {"<br>".join(f"• {t}" for t in failed_titles)}
-        </div>
-        """, unsafe_allow_html=True
-    )
+    if st.button("✅ 完成问卷提交", disabled=not can_submit, type="primary", width="stretch"):
+        try:
+            save_submission(expert_name.strip(), ROUND_NO, matrices_data, cr_results)
+            
+            st.session_state["is_submitted"] = True
+            st.rerun()
 
-can_submit = name_filled and len(failed_titles) == 0
-
-if st.button("✅ 完成问卷提交", disabled=not can_submit, type="primary", width="stretch"):
-    try:
-        save_submission(expert_name.strip(), ROUND_NO, matrices_data, cr_results)
-        st.balloons()
-        st.success("🎉 提交成功！您的数据已安全保存至云端，感谢您的专业参与！")
-    except Exception as e:
-        st.error(f"❌ 提交失败，数据库连接出现问题，请稍后重试或联系课题组。（错误信息：{e}）")
-
+        except Exception as e:
+            st.error(f"❌ 提交失败，数据库连接出现问题，请稍后重试或联系课题组。（错误信息：{e}）")
+else:
+    st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+    st.balloons() # 放气球庆祝
+    st.success("🎉 提交成功！您的数据已安全保存至云端，感谢您的专业参与！")
+    st.info("非常感谢您百忙之中抽出时间参与本次专家咨询！")
+    
+    st.markdown("""
+    ### ✅ 填报已结束
+    您现在可以关闭此网页！
+    """)
+    
 with st.sidebar:
     st.subheader("数据管理（课题组专用）")
     passcode = st.text_input("管理员口令", type="password", key="admin_passcode")
