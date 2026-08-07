@@ -149,26 +149,52 @@ def build_group_sheet(wb, group_key, items, expert_names, matrices, sheet_name):
 
 def build_cr_sheet(wb, groups, items_map, expert_names, crs, sheet_name="一致性检验CR"):
     ws = wb.create_sheet(sheet_name)
+    n_experts = len(expert_names)
+    
+    # 标题合并单元格宽度增加，适应新增的两列
     cell(ws, 1, 1, "各专家 · 各组判断矩阵一致性比率 CR（提交时已要求 CR<0.1，此表供复核）", BOLD)
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2 + len(expert_names))
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3 + n_experts)
+    
     r = 3
     cell(ws, r, 1, "指标组", HEADER_FONT, fill=HEADER_FILL)
+    
+    # 生成各专家的列头
     for e_idx, ename in enumerate(expert_names):
         cell(ws, r, 2 + e_idx, ename, HEADER_FONT, fill=HEADER_FILL)
+        
+    # [新增] 汇总列头
+    avg_col = 2 + n_experts
+    max_col = 3 + n_experts
+    cell(ws, r, avg_col, "平均汇总 CR", HEADER_FONT, fill=HEADER_FILL, align=Alignment(horizontal="center", vertical="center"))
+    cell(ws, r, max_col, "最差(最大) CR", HEADER_FONT, fill=HEADER_FILL, align=Alignment(horizontal="center", vertical="center"))
+    
     r += 1
+    
     for g in groups:
         cell(ws, r, 1, g)
-        for e_idx in range(len(expert_names)):
+        
+        # 填入各位专家的具体 CR 值
+        for e_idx in range(n_experts):
             v = crs[e_idx].get(g)
             f = CALC_FONT
             fill = None
             if isinstance(v, (int, float)) and v >= 0.1:
-                fill = PatternFill("solid", fgColor="FFF2CC")
-                f = Font(name=FONT_NAME, color="D97706", bold=True)
+                fill = PatternFill("solid", fgColor="FFF2CC")  # 浅黄高亮
+                f = Font(name=FONT_NAME, color="D97706", bold=True) # 橙色加粗
             cell(ws, r, 2 + e_idx, round(v, 4) if isinstance(v, (int, float)) else v, f, fill=fill, number_format="0.0000")
+        
+        # [新增] 动态写入 Excel 汇总公式 (Average 和 Max)
+        row_range = f"{get_column_letter(2)}{r}:{get_column_letter(1 + n_experts)}{r}"
+        
+        # 平均 CR
+        cell(ws, r, avg_col, f"=AVERAGE({row_range})", BOLD, number_format="0.0000")
+        # 最大 CR (找出一致性最差的一项)
+        cell(ws, r, max_col, f"=MAX({row_range})", CALC_FONT, number_format="0.0000")
+        
         r += 1
+        
     ws.column_dimensions["A"].width = 12
-    for j in range(2, 2 + len(expert_names)):
+    for j in range(2, 4 + n_experts): 
         ws.column_dimensions[get_column_letter(j)].width = 14
 
 
