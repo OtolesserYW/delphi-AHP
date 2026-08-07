@@ -1,16 +1,9 @@
 """
 AHP 专家问卷数据分析脚本
-用法：python analyze_ahp.py <导出的csv路径> <输出xlsx路径>
-
 功能：
-1. 解析 Streamlit 问卷后台导出的 CSV（matrices_json / cr_json 为嵌套 JSON 字符串）
-2. 为每个层级/每组指标生成一个工作表：展示各专家原始判断矩阵、
-   按"行几何平均法"（与你参考文献中 AHP 权重计算公式一致：Wi=(∏aij)^(1/n)后归一化）
-   算出的专家局部权重，再用 GEOMEAN 对多位专家的局部权重做几何平均聚合
-3. 生成"组合权重汇总"工作表：将二级/三级指标的局部权重逐级相乘，
-   得到相对于总目标的最终组合权重（全局权重），并按大小排序
-4. 全程使用 Excel 公式（GEOMEAN / SUM / 乘积），而非把计算结果写死，
-   这样以后再导出新一轮数据，只需替换原始判断矩阵区域即可重新计算
+1. 解析 Streamlit 问卷后台导出的 CSV
+2. 为每个层级生成工作表，展示各专家原始矩阵及局部权重
+3. 生成组合权重汇总工作表，基于群决策 AIJ 法计算聚合矩阵及 CR 值 (符合 SCI 标准)
 """
 import sys
 import json
@@ -20,32 +13,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-def get_ahp_cr(matrix: np.ndarray) -> float:
-    n = matrix.shape[
-0
-]
-    if n <= 2: return 0.0
-    eigenvalues = np.linalg.eigvals(matrix)
-    lambda_max = np.
-max
-(eigenvalues.real)
-    CI = (lambda_max - n) / (n - 
-1
-)
-    # Saaty 标准 RI 表
-    RI_TABLE = [
-0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49
-]
-    RI = RI_TABLE[n - 
-1] if n <= len(RI_TABLE) else 1.49
-    if RI == 0: return 0.0
-    return max(CI / RI, 0.0
-)
-
 FONT_NAME = "Microsoft YaHei"
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 GROUP_FILL = PatternFill("solid", fgColor="D9E2F3")
-INPUT_FONT = Font(name=FONT_NAME, color="0000FF")  # 蓝色=硬编码输入（专家原始打分）
+INPUT_FONT = Font(name=FONT_NAME, color="0000FF")  # 蓝色=硬编码输入
 CALC_FONT = Font(name=FONT_NAME, color="000000")   # 黑色=公式计算结果
 HEADER_FONT = Font(name=FONT_NAME, bold=True, color="FFFFFF")
 BOLD = Font(name=FONT_NAME, bold=True)
@@ -56,7 +27,6 @@ GROUP_ORDER = ["L1", "L2_A", "L2_B", "L2_C",
                "L3_A1", "L3_A2", "L3_A3", "L3_A4", "L3_A5", "L3_A6",
                "L3_B1", "L3_B2", "L3_B3", "L3_C1", "L3_C2", "L3_C3"]
 
-# 组内的父级指标名称（用于汇总表拼接层级关系）
 PARENT_OF = {
     "L2_A": "A.病原体与相应疾病风险特征", "L2_B": "B.环境暴露风险", "L2_C": "C.个体风险与健康基础",
     "L3_A1": "A1.病原体基础属性", "L3_A2": "A2.病原体变异与进化潜力", "L3_A3": "A3.传播特性与潜力",
@@ -65,6 +35,18 @@ PARENT_OF = {
     "L3_C1": "C1.工作场景暴露风险", "L3_C2": "C2.个体生理易感性", "L3_C3": "C3.个体防护装备的身体适配性",
 }
 L2_GROUP_OF_L1_ITEM = {"A.病原体与相应疾病风险特征": "L2_A", "B.环境暴露风险": "L2_B", "C.个体风险与健康基础": "L2_C"}
+
+
+def get_ahp_cr(matrix: np.ndarray) -> float:
+    n = matrix.shape[0]
+    if n <= 2: return 0.0
+    eigenvalues = np.linalg.eigvals(matrix)
+    lambda_max = np.max(eigenvalues.real)
+    CI = (lambda_max - n) / (n - 1)
+    RI_TABLE = [0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49]
+    RI = RI_TABLE[n - 1] if n <= len(RI_TABLE) else 1.49
+    if RI == 0: return 0.0
+    return max(CI / RI, 0.0)
 
 
 def cell(ws, row, col, value, font=None, fill=None, align=None, border=BORDER, number_format=None):
@@ -80,7 +62,6 @@ def cell(ws, row, col, value, font=None, fill=None, align=None, border=BORDER, n
 
 
 def build_group_sheet(wb, group_key, items, expert_names, matrices, sheet_name):
-    """为一个指标组生成工作表，返回 {item: 聚合后归一化权重所在单元格坐标} 供汇总表引用"""
     ws = wb.create_sheet(sheet_name)
     n = len(items)
     n_experts = len(expert_names)
@@ -91,14 +72,12 @@ def build_group_sheet(wb, group_key, items, expert_names, matrices, sheet_name):
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2 + n)
     r += 2
 
-    weight_col_start = {}  # expert_idx -> 该专家局部权重列首行(该专家权重列的列号)
-    expert_block_start_row = r
-
+    weight_col_start = {} 
+    
     for e_idx, ename in enumerate(expert_names):
         cell(ws, r, 1, f"专家：{ename}", BOLD, fill=GROUP_FILL)
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2 + n)
         r += 1
-        header_row = r
         cell(ws, r, 1, "指标", HEADER_FONT, fill=HEADER_FILL)
         for j, it in enumerate(items):
             cell(ws, r, 2 + j, it, HEADER_FONT, fill=HEADER_FILL,
@@ -134,7 +113,6 @@ def build_group_sheet(wb, group_key, items, expert_names, matrices, sheet_name):
     cell(ws, r, 1, "各专家局部权重汇总与聚合（几何平均法聚合多位专家意见）", BOLD, fill=GROUP_FILL)
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3 + n_experts)
     r += 1
-    header_row2 = r
     cell(ws, r, 1, "指标", HEADER_FONT, fill=HEADER_FILL)
     for e_idx, ename in enumerate(expert_names):
         cell(ws, r, 2 + e_idx, ename, HEADER_FONT, fill=HEADER_FILL,
@@ -170,54 +148,28 @@ def build_group_sheet(wb, group_key, items, expert_names, matrices, sheet_name):
     return item_cell_ref
 
 
-def build_cr_sheet(wb, groups, items_map, expert_names, crs, sheet_name="一致性检验CR"):
+def build_cr_sheet(wb, groups, items_map, expert_names, crs, sheet_name="个人检验CR"):
     ws = wb.create_sheet(sheet_name)
-    n_experts = len(expert_names)
-    
-    # 标题合并单元格宽度增加，适应新增的两列
-    cell(ws, 1, 1, "各专家 · 各组判断矩阵一致性比率 CR（提交时已要求 CR<0.1，此表供复核）", BOLD)
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3 + n_experts)
-    
+    cell(ws, 1, 1, "各专家 · 各组判断矩阵一致性比率 CR（此表供复核单人极端偏差）", BOLD)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2 + len(expert_names))
     r = 3
     cell(ws, r, 1, "指标组", HEADER_FONT, fill=HEADER_FILL)
-    
-    # 生成各专家的列头
     for e_idx, ename in enumerate(expert_names):
         cell(ws, r, 2 + e_idx, ename, HEADER_FONT, fill=HEADER_FILL)
-        
-    # [新增] 汇总列头
-    avg_col = 2 + n_experts
-    max_col = 3 + n_experts
-    cell(ws, r, avg_col, "平均汇总 CR", HEADER_FONT, fill=HEADER_FILL, align=Alignment(horizontal="center", vertical="center"))
-    cell(ws, r, max_col, "最差(最大) CR", HEADER_FONT, fill=HEADER_FILL, align=Alignment(horizontal="center", vertical="center"))
-    
     r += 1
-    
     for g in groups:
         cell(ws, r, 1, g)
-        
-        # 填入各位专家的具体 CR 值
-        for e_idx in range(n_experts):
+        for e_idx in range(len(expert_names)):
             v = crs[e_idx].get(g)
             f = CALC_FONT
             fill = None
             if isinstance(v, (int, float)) and v >= 0.1:
-                fill = PatternFill("solid", fgColor="FFF2CC")  # 浅黄高亮
-                f = Font(name=FONT_NAME, color="D97706", bold=True) # 橙色加粗
+                fill = PatternFill("solid", fgColor="FFF2CC")
+                f = Font(name=FONT_NAME, color="D97706", bold=True)
             cell(ws, r, 2 + e_idx, round(v, 4) if isinstance(v, (int, float)) else v, f, fill=fill, number_format="0.0000")
-        
-        # [新增] 动态写入 Excel 汇总公式 (Average 和 Max)
-        row_range = f"{get_column_letter(2)}{r}:{get_column_letter(1 + n_experts)}{r}"
-        
-        # 平均 CR
-        cell(ws, r, avg_col, f"=AVERAGE({row_range})", BOLD, number_format="0.0000")
-        # 最大 CR (找出一致性最差的一项)
-        cell(ws, r, max_col, f"=MAX({row_range})", CALC_FONT, number_format="0.0000")
-        
         r += 1
-        
     ws.column_dimensions["A"].width = 12
-    for j in range(2, 4 + n_experts): 
+    for j in range(2, 2 + len(expert_names)):
         ws.column_dimensions[get_column_letter(j)].width = 14
 
 
@@ -240,16 +192,13 @@ def build_expert_sheet(wb, df, sheet_name="专家名单"):
 
 
 def build_summary_sheet(wb, item_cell_refs, wb_group_items, mats):
-    # 1. 计算“群体聚合判断矩阵”的真实 CR 值 (SCI 高阶标准)
+    # 计算“群体聚合判断矩阵”的真实 CR 值 (SCI 高阶标准)
     agg_crs = {}
     for g in GROUP_ORDER:
-        # 提取所有专家该组的判断矩阵
         group_matrices = [np.array(m[g]["matrix"]) for m in mats]
         if group_matrices:
-            # 矩阵元素级的几何平均 (AIJ法：Aggregation of Individual Judgments)
             stacked = np.stack(group_matrices)
             agg_matrix = np.exp(np.mean(np.log(stacked), axis=0))
-            # 计算这个群体聚合矩阵的 CR
             agg_crs[g] = get_ahp_cr(agg_matrix)
         else:
             agg_crs[g] = 0.0
@@ -258,8 +207,7 @@ def build_summary_sheet(wb, item_cell_refs, wb_group_items, mats):
     cell(ws, 1, 1, "各级指标组合权重（相对总目标的全局权重）汇总", BOLD)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
     
-    # 将最高层的一级指标矩阵CR写在表头备注里
-    cell(ws, 2, 1, f"注：总目标判断矩阵(一级指标)的 群体聚合 CR 值为 {agg_crs['L1']:.3f}", Font(name=FONT_NAME, color="D97706", bold=True))
+    cell(ws, 2, 1, f"注：总目标判断矩阵(一级指标)的群体聚合 CR 值为 {agg_crs['L1']:.3f}", Font(name=FONT_NAME, color="D97706", bold=True))
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=7)
 
     r = 3
@@ -330,15 +278,8 @@ def build_summary_sheet(wb, item_cell_refs, wb_group_items, mats):
     ws.freeze_panes = "A4"
     return first_data_row, last_data_row
 
-def build_workbook(df: pd.DataFrame) -> Workbook:
-    """
-    核心分析入口：接收一份包含 expert_name / matrices_json / cr_json 等列的
-    DataFrame（不管数据来自 CSV 文件还是数据库查询结果，只要列名一致即可），
-    返回生成好的 openpyxl Workbook 对象，不涉及任何文件读写。
 
-    这样 Streamlit 网站的管理员面板可以直接把数据库查出来的 df 传进来，
-    在内存里生成 Excel 供下载，不需要先导出 CSV 再本地运行脚本。
-    """
+def build_workbook(df: pd.DataFrame) -> Workbook:
     df = df.reset_index(drop=True)
     expert_names = df["expert_name"].tolist()
     mats = [json.loads(x) for x in df["matrices_json"]]
@@ -363,7 +304,6 @@ def build_workbook(df: pd.DataFrame) -> Workbook:
 
 
 def main(csv_path, out_path):
-    """命令行入口：仍然保留，本地跑 `python analyze_ahp.py xxx.csv xxx.xlsx` 不受影响。"""
     df = pd.read_csv(csv_path)
     wb = build_workbook(df)
     wb.save(out_path)
