@@ -15,9 +15,32 @@ AHP 专家问卷数据分析脚本
 import sys
 import json
 import pandas as pd
+import numpy as np
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+def get_ahp_cr(matrix: np.ndarray) -> float:
+    n = matrix.shape[
+0
+]
+    if n <= 2: return 0.0
+    eigenvalues = np.linalg.eigvals(matrix)
+    lambda_max = np.
+max
+(eigenvalues.real)
+    CI = (lambda_max - n) / (n - 
+1
+)
+    # Saaty 标准 RI 表
+    RI_TABLE = [
+0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49
+]
+    RI = RI_TABLE[n - 
+1] if n <= len(RI_TABLE) else 1.49
+    if RI == 0: return 0.0
+    return max(CI / RI, 0.0
+)
 
 FONT_NAME = "Microsoft YaHei"
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
@@ -216,12 +239,31 @@ def build_expert_sheet(wb, df, sheet_name="专家名单"):
         ws.column_dimensions[col].width = w
 
 
-def build_summary_sheet(wb, item_cell_refs, wb_group_items):
+def build_summary_sheet(wb, item_cell_refs, wb_group_items, mats):
+    # 1. 计算“群体聚合判断矩阵”的真实 CR 值 (SCI 高阶标准)
+    agg_crs = {}
+    for g in GROUP_ORDER:
+        # 提取所有专家该组的判断矩阵
+        group_matrices = [np.array(m[g]["matrix"]) for m in mats]
+        if group_matrices:
+            # 矩阵元素级的几何平均 (AIJ法：Aggregation of Individual Judgments)
+            stacked = np.stack(group_matrices)
+            agg_matrix = np.exp(np.mean(np.log(stacked), axis=0))
+            # 计算这个群体聚合矩阵的 CR
+            agg_crs[g] = get_ahp_cr(agg_matrix)
+        else:
+            agg_crs[g] = 0.0
+
     ws = wb.create_sheet("组合权重汇总", 1)
     cell(ws, 1, 1, "各级指标组合权重（相对总目标的全局权重）汇总", BOLD)
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
+    
+    # 将最高层的一级指标矩阵CR写在表头备注里
+    cell(ws, 2, 1, f"注：总目标判断矩阵(一级指标)的 群体聚合 CR 值为 {agg_crs['L1']:.3f}", Font(name=FONT_NAME, color="D97706", bold=True))
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=7)
+
     r = 3
-    headers = ["一级指标", "二级指标", "三级指标", "组内局部权重", "组合权重（全局）", "备注"]
+    headers = ["一级指标", "二级指标", "三级指标", "组内局部权重", "组合权重（全局）", "二级矩阵CR值", "三级矩阵CR值"]
     for j, h in enumerate(headers):
         cell(ws, r, 1 + j, h, HEADER_FONT, fill=HEADER_FILL)
     r += 1
@@ -232,31 +274,48 @@ def build_summary_sheet(wb, item_cell_refs, wb_group_items):
         l1_local_ref = item_cell_refs["L1"][l1_item]
         l2_group = L2_GROUP_OF_L1_ITEM[l1_item]
         l2_items = wb_group_items[l2_group]
+        
+        first_l1 = True
+        
         for l2_item in l2_items:
             l2_local_ref = item_cell_refs[l2_group][l2_item]
             l2_global_formula = f"={l1_local_ref}*{l2_local_ref}"
             l3_group = [k for k, v in PARENT_OF.items() if v == l2_item and k.startswith("L3_")]
+            
+            first_l2 = True
+            
             if l3_group:
                 l3_group = l3_group[0]
                 l3_items = wb_group_items[l3_group]
-                first = True
                 for l3_item in l3_items:
                     l3_local_ref = item_cell_refs[l3_group][l3_item]
-                    cell(ws, r, 1, l1_item if first else "")
-                    cell(ws, r, 2, l2_item if first else "")
+                    cell(ws, r, 1, l1_item if first_l1 else "")
+                    cell(ws, r, 2, l2_item if first_l2 else "")
                     cell(ws, r, 3, l3_item)
-                    cell(ws, r, 4, f"={l3_local_ref}", number_format="0.0000")
-                    l2_global_cell = f"$G${r}" if False else None
-                    # 组合权重 = L1局部 * L2局部 * L3局部
-                    cell(ws, r, 5, f"={l1_local_ref}*{l2_local_ref}*{l3_local_ref}", CALC_FONT, number_format="0.0000")
-                    first = False
+                    cell(ws, r, 4, f"={l3_local_ref}", font=CALC_FONT, number_format="0.0000")
+                    cell(ws, r, 5, f"={l1_local_ref}*{l2_local_ref}*{l3_local_ref}", font=CALC_FONT, number_format="0.0000")
+                    
+                    if first_l1:
+                        cell(ws, r, 6, agg_crs[l2_group], font=CALC_FONT, number_format="0.000")
+                    if first_l2:
+                        cell(ws, r, 7, agg_crs[l3_group], font=CALC_FONT, number_format="0.000")
+                        
+                    first_l1 = False
+                    first_l2 = False
                     rows_written.append(r)
                     r += 1
             else:
-                cell(ws, r, 1, l1_item)
-                cell(ws, r, 2, l2_item)
+                cell(ws, r, 1, l1_item if first_l1 else "")
+                cell(ws, r, 2, l2_item if first_l2 else "")
                 cell(ws, r, 3, "(无三级指标)")
-                cell(ws, r, 5, l2_global_formula, CALC_FONT, number_format="0.0000")
+                cell(ws, r, 4, f"={l2_local_ref}", font=CALC_FONT, number_format="0.0000")
+                cell(ws, r, 5, l2_global_formula, font=CALC_FONT, number_format="0.0000")
+                
+                if first_l1:
+                    cell(ws, r, 6, agg_crs[l2_group], font=CALC_FONT, number_format="0.000")
+                    
+                first_l1 = False
+                first_l2 = False
                 rows_written.append(r)
                 r += 1
 
@@ -266,11 +325,10 @@ def build_summary_sheet(wb, item_cell_refs, wb_group_items):
     last_data_row = r - 1
     cell(ws, total_row, 5, f"=SUM(E{first_data_row}:E{last_data_row})", BOLD, number_format="0.0000")
 
-    for col, w in zip("ABCDEF", [26, 26, 30, 14, 16, 20]):
+    for col, w in zip("ABCDEFG", [26, 26, 30, 14, 16, 15, 15]):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = "A4"
     return first_data_row, last_data_row
-
 
 def build_workbook(df: pd.DataFrame) -> Workbook:
     """
@@ -298,7 +356,7 @@ def build_workbook(df: pd.DataFrame) -> Workbook:
         item_cell_refs[g] = refs
 
     build_expert_sheet(wb, df)
-    build_summary_sheet(wb, item_cell_refs, wb_group_items)
+    build_summary_sheet(wb, item_cell_refs, wb_group_items, mats)
     build_cr_sheet(wb, GROUP_ORDER, wb_group_items, expert_names, crs)
 
     return wb
